@@ -54,6 +54,22 @@
   .menu-note .mn-ico{margin-right:6px;}
   .menu-note .mn-name{font-weight:800; margin-right:8px;}
 
+  /* OCR (写真から自動入力) */
+  .ocr-bar{margin-bottom:12px;}
+  .ocr-btn{width:100%; background:var(--panel); border:1px dashed var(--accent); color:var(--accent);
+    border-radius:12px; padding:12px; font-size:14px; font-weight:700;}
+  .ocr-btn:active{transform:scale(.99);}
+  .ocr-overlay{position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.62);
+    display:none; align-items:center; justify-content:center;}
+  .ocr-overlay.open{display:flex;}
+  .ocr-box{background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:22px 26px; text-align:center; min-width:220px;}
+  .ocr-spin{width:38px; height:38px; margin:0 auto 12px; border-radius:50%;
+    border:4px solid var(--line); border-top-color:var(--accent); animation:ocrspin .9s linear infinite;}
+  @keyframes ocrspin{to{transform:rotate(360deg);}}
+  .ocr-box #ocrMsg{font-size:14px; color:var(--text);}
+  .ocr-box .ocr-sub{font-size:12px; color:var(--sub); margin-top:6px;}
+
   /* centered modal (form) */
   .modal-scrim{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:45; opacity:0; pointer-events:none; transition:opacity .2s;}
   .modal-scrim.open{opacity:1; pointer-events:auto;}
@@ -194,6 +210,11 @@
 
   <div class="menu-note" id="menuNote" style="display:none"></div>
 
+  <div class="ocr-bar">
+    <button class="ocr-btn" onclick="document.getElementById('ocrFile').click()">📷 写真から数値を自動入力</button>
+    <input type="file" id="ocrFile" accept="image/*" capture="environment" style="display:none" onchange="onOcrFile(event)">
+  </div>
+
   <div class="court-wrap">
     <svg class="court" id="courtRecord" viewBox="0 0 500 470"></svg>
     <p class="hint">コート上の地点をタップ → 決めた本数を入力（例：20本中15本なら「15」）。<br>マーカーの数字は「決めた本数／セット本数」。既存の地点はタップで再編集できます。</p>
@@ -283,6 +304,15 @@
   <button onclick="duplicatePreset()">📋 複製</button>
   <button class="rm" onclick="deletePreset()">🗑 削除</button>
   <button onclick="closePresetMenu()">閉じる</button>
+</div>
+
+<!-- OCR 進捗オーバーレイ -->
+<div class="ocr-overlay" id="ocrOverlay">
+  <div class="ocr-box">
+    <div class="ocr-spin"></div>
+    <div id="ocrMsg">解析中…</div>
+    <div class="ocr-sub" id="ocrSub">写真から数字を読み取っています</div>
+  </div>
 </div>
 
 <nav class="tabs">
@@ -650,6 +680,97 @@ function clearSession(){
   if(!s||!s.spots.length) return;
   if(confirm('現在のセッションの記録を全て消去しますか？')){
     s.spots=[]; save(); renderRecord();
+  }
+}
+
+/* ---------- 写真から数値を自動入力（端末内OCR: Tesseract.js） ---------- */
+let _tessScriptLoading=null;
+function ensureTesseract(){
+  if(window.Tesseract) return Promise.resolve();
+  if(_tessScriptLoading) return _tessScriptLoading;
+  _tessScriptLoading = new Promise((resolve,reject)=>{
+    const sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    sc.onload=()=>resolve(); sc.onerror=()=>reject(new Error('tesseract load failed'));
+    document.head.appendChild(sc);
+  });
+  return _tessScriptLoading;
+}
+function showOcr(msg,sub){
+  document.getElementById('ocrMsg').textContent=msg||'解析中…';
+  if(sub!=null) document.getElementById('ocrSub').textContent=sub;
+  document.getElementById('ocrOverlay').classList.add('open');
+}
+function hideOcr(){ document.getElementById('ocrOverlay').classList.remove('open'); }
+
+// Tesseractのword一覧から数字を「上→下・左→右」の読み順で取り出す
+function extractOrderedNumbers(words){
+  const items=(words||[]).map(w=>{
+    const digits=(w.text||'').replace(/[^0-9]/g,'');
+    const b=w.bbox||{x0:0,x1:0,y0:0,y1:0};
+    return {n:parseInt(digits,10), ok:digits.length>0,
+      x:(b.x0+b.x1)/2, y:(b.y0+b.y1)/2, h:Math.max(1,b.y1-b.y0)};
+  }).filter(w=>w.ok && !isNaN(w.n));
+  if(!items.length) return [];
+  items.sort((a,b)=>a.y-b.y);
+  const avgH=items.reduce((s,w)=>s+w.h,0)/items.length;
+  const thr=Math.max(12, avgH*0.6);
+  const rows=[]; let cur=[], lastY=null;
+  for(const w of items){
+    if(lastY===null || Math.abs(w.y-lastY)<=thr) cur.push(w);
+    else { rows.push(cur); cur=[w]; }
+    lastY=w.y;
+  }
+  if(cur.length) rows.push(cur);
+  const out=[];
+  rows.forEach(r=>{ r.sort((a,b)=>a.x-b.x); r.forEach(w=>out.push(w.n)); });
+  return out;
+}
+
+// 読み取った数字を、現在のスポットへ先頭から順に入れる
+function applyOcrNumbers(nums){
+  const s=currentSession();
+  if(!s.spots.length){
+    alert('先にメニューを選ぶ／コートをタップして、スポットを配置してから使ってください。');
+    return;
+  }
+  if(!nums.length){
+    alert('数字を読み取れませんでした。明るく・まっすぐ・大きめに撮ると精度が上がります。手書きは誤認識も出るので、必要ならマークをタップして手入力してください。');
+    return;
+  }
+  let filled=0;
+  s.spots.forEach((sp,i)=>{ if(i<nums.length){ sp.makes=Math.max(0,Math.min(sp.attempts,nums[i])); filled++; } });
+  save(); renderRecord();
+  const extra = nums.length>s.spots.length ? `\n（余った数字: ${nums.slice(s.spots.length).join(', ')}）` : '';
+  alert(`読み取った数字（上→下・左→右の順）:\n${nums.join(', ')}\n\n先頭から ${filled} 個のスポットへ入れました。${extra}\n各マークをタップして確認・修正してください。`);
+}
+
+async function onOcrFile(e){
+  const file=e.target.files && e.target.files[0];
+  e.target.value=''; // 同じ写真を再選択できるように
+  if(!file) return;
+  const s=currentSession();
+  if(!s.spots.length){
+    alert('先にメニューを選ぶ／コートをタップして、スポットを配置してから使ってください。');
+    return;
+  }
+  let worker=null;
+  try{
+    showOcr('準備中…','初回は文字認識データの読み込みに少し時間がかかります（要ネット接続）');
+    await ensureTesseract();
+    worker=await Tesseract.createWorker('eng',1,{
+      logger:(m)=>{ if(m.status==='recognizing text'){ showOcr('数字を認識中…', Math.round((m.progress||0)*100)+'%'); } }
+    });
+    await worker.setParameters({ tessedit_char_whitelist:'0123456789', tessedit_pageseg_mode:'11' });
+    const { data } = await worker.recognize(file);
+    const nums = extractOrderedNumbers(data.words);
+    hideOcr();
+    applyOcrNumbers(nums);
+  }catch(err){
+    hideOcr();
+    alert('画像の解析に失敗しました。\n・初回はネット接続が必要です\n・明るく、数字が大きく写った写真で再度お試しください\nうまくいかない場合は、マークをタップして手入力もできます。');
+  }finally{
+    if(worker){ try{ await worker.terminate(); }catch(_){} }
   }
 }
 
