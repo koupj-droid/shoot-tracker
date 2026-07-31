@@ -70,6 +70,20 @@
   .ocr-box #ocrMsg{font-size:14px; color:var(--text);}
   .ocr-box .ocr-sub{font-size:12px; color:var(--sub); margin-top:6px;}
 
+  /* 保存まわり */
+  .bar-label{font-size:11px; color:var(--sub); margin:0 2px 6px; font-weight:700;}
+  .save-bar{background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:12px; margin:12px 0 8px; text-align:center;}
+  .save-status{font-size:12px; color:var(--make); margin-bottom:10px; font-weight:700;}
+  .save-status.empty{color:var(--sub);}
+  .btn.wide{width:100%; padding:14px 0; font-size:15px; font-weight:800;}
+  .save-hint{font-size:11px; color:var(--sub); margin-top:8px;}
+  .toast{position:fixed; left:50%; bottom:86px; transform:translateX(-50%) translateY(20px);
+    background:var(--panel2); border:1px solid var(--accent); color:var(--text);
+    padding:12px 18px; border-radius:12px; font-size:14px; font-weight:700; z-index:60;
+    opacity:0; pointer-events:none; transition:.25s; box-shadow:0 6px 24px rgba(0,0,0,.5); max-width:88vw;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
   /* フレンド */
   .fr-card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:6px;}
   .fr-sub{font-size:12px; color:var(--sub); margin-bottom:8px; line-height:1.5;}
@@ -229,10 +243,11 @@
     <div class="chips" id="setChips"></div>
   </div>
 
+  <div class="bar-label">練習メニュー（スポットの配置）</div>
   <div class="preset-bar">
     <select id="presetSelect" onchange="onPresetSelect()"><option value="">— メニューを選ぶと配置 —</option></select>
     <button class="mini" onclick="applyPreset()">配置し直す</button>
-    <button class="mini" onclick="openPresetForm('new')">＋保存</button>
+    <button class="mini" onclick="openPresetForm('new')">＋この配置をメニュー登録</button>
     <button class="mini" onclick="openPresetMenu()">⋯</button>
   </div>
 
@@ -250,9 +265,15 @@
 
   <div class="stat-grid" id="statGrid"></div>
 
+  <div class="save-bar">
+    <div class="save-status" id="saveStatus">✓ 記録は自動で保存されています</div>
+    <button class="btn accent wide" onclick="finishSession()">✅ この練習を終えて保存</button>
+    <div class="save-hint">押すと履歴に残り、次の練習を新しく始められます（メニューを選ぶと再開）</div>
+  </div>
+
   <div class="actions">
     <button class="btn danger" onclick="undoLastSpot()">↩︎ 直前の地点を取消</button>
-    <button class="btn danger" onclick="clearSession()">現在のセッションを消去</button>
+    <button class="btn danger" onclick="clearSession()">🗑 今の記録を全部消す</button>
   </div>
 </section>
 
@@ -287,6 +308,7 @@
 </section>
 
 <!-- bottom sheet -->
+<div class="toast" id="toast"></div>
 <div class="scrim" id="scrim" onclick="closeSheet()"></div>
 <div class="sheet" id="sheet">
   <div class="sheet-card">
@@ -414,7 +436,8 @@ function el(tag,attrs){
 }
 
 /* ---------- データ ---------- */
-let sessions = load();
+let sessions = load().filter(s=>s.spots.length);   // 空のセッションは残さない
+let lastSetSize = parseInt(localStorage.getItem('bball_lastSetSize'),10) || 20;
 let presets = loadPresets();
 let currentId = null;
 let selectedSpotId = null;
@@ -447,7 +470,7 @@ function currentSession(){
   let s = sessions.find(x=>x.id===currentId);
   if(!s){
     const pn=document.getElementById('playerName');
-    s = {id:Date.now(), player:(pn?pn.value.trim():''), name:'', date:new Date().toISOString(), setSize:20, spots:[]};
+    s = {id:Date.now(), player:(pn?pn.value.trim():''), name:'', date:new Date().toISOString(), setSize:lastSetSize, spots:[]};
     sessions.unshift(s); currentId = s.id;
   }
   if(typeof s.setSize!=='number') s.setSize=20;
@@ -812,14 +835,17 @@ function spotMarker(sp, selected){
 
 /* ---------- セット本数 ---------- */
 function renderSetBar(){
-  const s = currentSession();
-  document.getElementById('setLabel').textContent = s.setSize;
+  // ここではセッションを作らない（見るだけで空の記録が増えないように）
+  const s = sessions.find(x=>x.id===currentId);
+  const size = s? s.setSize : lastSetSize;
+  document.getElementById('setLabel').textContent = size;
   const wrap=document.getElementById('setChips');
-  const presets = PRESETS.includes(s.setSize)?PRESETS:[...PRESETS, s.setSize].sort((a,b)=>a-b);
-  wrap.innerHTML = presets.map(v=>`<button class="${v===s.setSize?'active':''}" onclick="setSetSize(${v})">${v}本</button>`).join('')
+  const opts = PRESETS.includes(size)?PRESETS:[...PRESETS, size].sort((a,b)=>a-b);
+  wrap.innerHTML = opts.map(v=>`<button class="${v===size?'active':''}" onclick="setSetSize(${v})">${v}本</button>`).join('')
     + `<button onclick="customSetSize()">その他…</button>`;
 }
 function setSetSize(v){
+  lastSetSize=v; localStorage.setItem('bball_lastSetSize', v);
   const s=currentSession();
   s.setSize=v;
   s.spots.forEach(sp=>{ sp.attempts=v; clampMakes(sp); });
@@ -902,6 +928,40 @@ function undoLastSpot(){
   save();
   if(selectedSpotId===removed.id) closeSheet();
   else renderRecord();
+}
+/* ---------- 保存まわり ---------- */
+let toastTimer=null;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'), 2600);
+}
+function updateSaveStatus(){
+  const el=document.getElementById('saveStatus'); if(!el) return;
+  const s=sessions.find(x=>x.id===currentId);
+  const t=s? tally(s.spots) : {m:0,a:0};
+  if(t.a>0){
+    const who=(s.player||'').trim();
+    el.className='save-status';
+    el.textContent=`✓ 保存済み${who?'（'+who+'）':''}　${t.m}/${t.a}本 ・ ${pct(t.m,t.a)}%`;
+  }else{
+    el.className='save-status empty';
+    el.textContent='記録するとここに自動で保存されます';
+  }
+}
+function finishSession(){
+  const s=sessions.find(x=>x.id===currentId);
+  const t=s? tally(s.spots) : {m:0,a:0};
+  if(!s || t.a===0){ toast('まだ記録がありません'); return; }
+  const d=new Date(s.date);
+  if(!s.name) s.name=`${d.getMonth()+1}/${d.getDate()} の練習`;
+  save();
+  const label=s.name;
+  // 次の練習へ。ここでは配置しない（打つ前の「0/◯本」が履歴に残らないように）
+  currentId=null; selectedSpotId=null;
+  document.getElementById('sessionName').value='';
+  renderSetBar(); renderPresetBar(); renderMenuNote(); renderRecord();
+  toast(`「${label}」を保存しました（${t.m}/${t.a}本・${pct(t.m,t.a)}%）`);
 }
 function clearSession(){
   const s=sessions.find(x=>x.id===currentId);
@@ -1010,6 +1070,7 @@ function renderRecord(){
   const spots = s?s.spots:[];
   spots.forEach(sp=>svg.appendChild(spotMarker(sp, sp.id===selectedSpotId)));
   document.getElementById('statGrid').innerHTML = statCards(spots);
+  updateSaveStatus();
 }
 function statCards(spots){
   const all=tally(spots), two=tally(spots,s=>!is3(s)), three=tally(spots,is3);
@@ -1083,8 +1144,9 @@ function zoneBreakdown(spots){
 /* ---------- 履歴 ---------- */
 function renderHistory(){
   const wrap=document.getElementById('histList');
-  if(!sessions.length){ wrap.innerHTML='<div class="empty">まだ記録がありません。<br>「記録」タブから始めましょう。</div>'; return; }
-  wrap.innerHTML=sessions.map(s=>{
+  const list=sessions.filter(s=>s.spots.length);   // 中身のない練習は出さない
+  if(!list.length){ wrap.innerHTML='<div class="empty">まだ記録がありません。<br>「記録」タブから始めましょう。</div>'; return; }
+  wrap.innerHTML=list.map(s=>{
     const d=new Date(s.date), t=tally(s.spots);
     const name=s.name||`${d.getMonth()+1}/${d.getDate()} のセッション`;
     const who=(s.player||'').trim()? `${s.player.trim()}｜` : '';
