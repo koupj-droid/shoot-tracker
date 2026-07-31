@@ -70,6 +70,34 @@
   .ocr-box #ocrMsg{font-size:14px; color:var(--text);}
   .ocr-box .ocr-sub{font-size:12px; color:var(--sub); margin-top:6px;}
 
+  /* フレンド */
+  .fr-card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:6px;}
+  .fr-sub{font-size:12px; color:var(--sub); margin-bottom:8px; line-height:1.5;}
+  .codebox{width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:10px; font-size:12px; font-family:ui-monospace,Menlo,monospace;
+    resize:vertical; word-break:break-all;}
+  .codebox:focus{outline:none; border-color:var(--accent);}
+  .fr-row{display:flex; align-items:center; gap:10px; padding:11px 12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; margin-bottom:7px;}
+  .fr-row.me{border-color:var(--accent); background:rgba(255,122,60,.10);}
+  .fr-row .rk{width:22px; font-size:13px; font-weight:800; color:var(--sub); text-align:center;}
+  .fr-row .nm{flex:1; min-width:0;}
+  .fr-row .nm b{font-size:15px;}
+  .fr-row .nm .sm{font-size:11px; color:var(--sub); margin-top:2px;}
+  .fr-row .sp{text-align:right; font-size:12px; color:var(--sub); line-height:1.45; white-space:nowrap;}
+  .fr-row .sp b{font-size:15px; color:var(--text);}
+  .fr-row .del{background:none; border:none; color:var(--sub); font-size:16px; padding:2px 0 2px 4px;}
+  .fr-avg{border-style:dashed; opacity:.9;}
+  .cmp-row{display:flex; align-items:center; gap:8px; padding:10px 12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; margin-bottom:6px; font-size:13px;}
+  .cmp-row .cl{flex:1; min-width:0;}
+  .cmp-row .cv{width:74px; text-align:right; color:var(--sub);}
+  .cmp-row .cv b{color:var(--text);}
+  .cmp-row .cd{width:52px; text-align:right; font-weight:800;}
+  .cmp-row .cd.win{color:var(--make);} .cmp-row .cd.lose{color:var(--miss);}
+  .cmp-head{display:flex; gap:8px; padding:0 12px 6px; font-size:11px; color:var(--sub);}
+  .cmp-head .cl{flex:1;} .cmp-head .cv{width:74px; text-align:right;} .cmp-head .cd{width:52px; text-align:right;}
+
   /* centered modal (form) */
   .modal-scrim{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:45; opacity:0; pointer-events:none; transition:opacity .2s;}
   .modal-scrim.open{opacity:1; pointer-events:auto;}
@@ -306,6 +334,36 @@
   <button onclick="closePresetMenu()">閉じる</button>
 </div>
 
+<!-- ===== フレンド ===== -->
+<section class="view" id="view-friends">
+  <div class="section-h">自分のコード</div>
+  <div class="fr-card">
+    <div class="fr-sub" id="myCodeSub">このコードをフレンドに送ると、あなたの成績を見せられます。</div>
+    <textarea id="myCode" class="codebox" rows="3" readonly onclick="this.select()"></textarea>
+    <div class="actions">
+      <button class="btn" onclick="copyMyCode()">📋 コピー</button>
+      <button class="btn" onclick="shareMyCode()">↗︎ 送る</button>
+      <button class="btn" onclick="refreshMyCode()">↻ 更新</button>
+    </div>
+  </div>
+
+  <div class="section-h">フレンドを追加</div>
+  <div class="fr-card">
+    <textarea id="friendCodeInput" class="codebox" rows="3" placeholder="もらったコードをここに貼り付け（ST1…）"></textarea>
+    <div class="actions">
+      <button class="btn accent" onclick="addFriendFromCode()">＋ 追加 / 更新</button>
+      <button class="btn" onclick="pasteFriendCode()">📥 貼り付け</button>
+    </div>
+  </div>
+
+  <div class="section-h">みんなの成績（2P / 3P）</div>
+  <div id="friendRanking"></div>
+
+  <div class="section-h">スポット別の比較</div>
+  <div class="filter-row"><select id="friendCompareSelect" onchange="renderSpotCompare()"></select></div>
+  <div id="spotCompare"></div>
+</section>
+
 <!-- OCR 進捗オーバーレイ -->
 <div class="ocr-overlay" id="ocrOverlay">
   <div class="ocr-box">
@@ -318,6 +376,7 @@
 <nav class="tabs">
   <button class="active" data-view="record" onclick="switchView('record')"><span class="ico">🎯</span>記録</button>
   <button data-view="chart" onclick="switchView('chart')"><span class="ico">📊</span>チャート</button>
+  <button data-view="friends" onclick="switchView('friends')"><span class="ico">👥</span>フレンド</button>
   <button data-view="history" onclick="switchView('history')"><span class="ico">🗂</span>履歴</button>
 </nav>
 
@@ -387,7 +446,8 @@ function rid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 function currentSession(){
   let s = sessions.find(x=>x.id===currentId);
   if(!s){
-    s = {id:Date.now(), player:'', name:'', date:new Date().toISOString(), setSize:20, spots:[]};
+    const pn=document.getElementById('playerName');
+    s = {id:Date.now(), player:(pn?pn.value.trim():''), name:'', date:new Date().toISOString(), setSize:20, spots:[]};
     sessions.unshift(s); currentId = s.id;
   }
   if(typeof s.setSize!=='number') s.setSize=20;
@@ -463,6 +523,8 @@ function applyPreset(){
   if(!p){ alert('メニューを選択してください。'); return; }
   const s=currentSession();
   if(s.spots.length && !confirm('現在の記録を、選んだエリア配置に置き換えますか？（決めた本数は0にリセットされます）')) return;
+  s.player = document.getElementById('playerName').value.trim();
+  s.name   = document.getElementById('sessionName').value.trim();
   s.setSize=p.setSize||s.setSize;
   s.spots=p.spots.map(pt=>({id:rid(), x:pt.x, y:pt.y, makes:0, attempts:s.setSize}));
   selectedSpotId=null;
@@ -567,6 +629,172 @@ function playerSpots(name){
 function renderPlayerList(){
   const dl=document.getElementById('playerList');
   dl.innerHTML = uniquePlayers().map(p=>`<option value="${p.replace(/"/g,'&quot;')}">`).join('');
+}
+
+/* ---------- フレンド（コード交換方式・サーバー不要） ---------- */
+let friends = loadFriends();
+function loadFriends(){ try{ return JSON.parse(localStorage.getItem('bball_friends')||'[]'); }catch(e){ return []; } }
+function saveFriends(){ localStorage.setItem('bball_friends', JSON.stringify(friends)); }
+
+function b64enc(str){ let bin=''; new TextEncoder().encode(str).forEach(b=>bin+=String.fromCharCode(b)); return btoa(bin); }
+function b64dec(b64){ const bin=atob(b64); return new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))); }
+
+// 近い座標のスポットをまとめて合算（複数セッション分を1スポットに）
+function mergeSpots(spots){
+  const out=[];
+  spots.forEach(sp=>{
+    const hit=out.find(o=>Math.hypot(o.x-sp.x,o.y-sp.y)<=HIT_R);
+    if(hit){ hit.makes+=sp.makes; hit.attempts+=sp.attempts; }
+    else out.push({x:sp.x, y:sp.y, makes:sp.makes, attempts:sp.attempts});
+  });
+  return out;
+}
+function myName(){ return (document.getElementById('playerName').value||'').trim() || '自分'; }
+function myAggregatedSpots(){
+  const name=(document.getElementById('playerName').value||'').trim();
+  const spots = name ? playerSpots(name) : sessions.reduce((a,s)=>a.concat(s.spots),[]);
+  return mergeSpots(spots);
+}
+
+function makeMyCode(){
+  const spots=myAggregatedSpots().filter(sp=>sp.attempts>0);
+  const payload={v:1, n:myName(), d:Date.now(),
+    s:spots.map(sp=>[Math.round(sp.x), Math.round(sp.y), sp.makes, sp.attempts])};
+  return 'ST1'+b64enc(JSON.stringify(payload)).replace(/=+$/,'');
+}
+function parseCode(code){
+  const c=(code||'').trim().replace(/\s+/g,'');
+  if(!c.startsWith('ST1')) throw new Error('形式が違います');
+  let b=c.slice(3); while(b.length%4) b+='=';
+  const p=JSON.parse(b64dec(b));
+  if(!p || !Array.isArray(p.s)) throw new Error('中身が読めません');
+  return {name:(p.n||'フレンド').slice(0,20), date:p.d||Date.now(),
+    spots:p.s.map(a=>({x:+a[0], y:+a[1], makes:+a[2], attempts:+a[3]}))
+             .filter(sp=>isFinite(sp.x)&&isFinite(sp.y)&&sp.attempts>0)};
+}
+
+function refreshMyCode(){
+  const spots=myAggregatedSpots().filter(sp=>sp.attempts>0);
+  const t=tally(spots);
+  document.getElementById('myCode').value = makeMyCode();
+  document.getElementById('myCodeSub').textContent =
+    spots.length ? `${myName()} の成績（${spots.length}スポット・${t.m}/${t.a}本）。このコードを送ると相手の一覧に並びます。`
+                 : 'まだ記録がありません。記録するとコードに成績が入ります。';
+}
+function copyMyCode(){
+  const el=document.getElementById('myCode');
+  el.select();
+  navigator.clipboard?.writeText(el.value).then(()=>alert('コピーしました。LINEなどで送ってください。'))
+    .catch(()=>{ document.execCommand('copy'); alert('コピーしました。'); });
+}
+function shareMyCode(){
+  const code=document.getElementById('myCode').value;
+  if(navigator.share){ navigator.share({title:'シュート成績', text:code}).catch(()=>{}); }
+  else copyMyCode();
+}
+function pasteFriendCode(){
+  if(!navigator.clipboard?.readText){ alert('貼り付けは、入力欄を長押しして「ペースト」を選んでください。'); return; }
+  navigator.clipboard.readText().then(t=>{ document.getElementById('friendCodeInput').value=t; })
+    .catch(()=>alert('貼り付けできませんでした。入力欄を長押しして「ペースト」を選んでください。'));
+}
+function addFriendFromCode(){
+  const box=document.getElementById('friendCodeInput');
+  let f;
+  try{ f=parseCode(box.value); }
+  catch(e){ alert('コードを読み取れませんでした。\n「ST1」で始まる文字列を全部コピーして貼り付けてください。'); return; }
+  const i=friends.findIndex(x=>x.name===f.name);
+  if(i>=0){ friends[i]=f; } else { friends.push(f); }
+  saveFriends(); box.value='';
+  renderFriends();
+  alert(`${f.name} さんを${i>=0?'更新':'追加'}しました（${f.spots.length}スポット）。`);
+}
+function deleteFriend(name){
+  if(!confirm(`${name} さんを削除しますか？`)) return;
+  friends=friends.filter(f=>f.name!==name); saveFriends(); renderFriends();
+}
+
+function statsOf(spots){
+  const all=tally(spots), two=tally(spots,s=>!is3(s)), three=tally(spots,is3);
+  // 記録がない区分は null（0%扱いにせず「–」表示・平均からも除外）
+  const p=(t)=>t.a? Math.round(t.m/t.a*100) : null;
+  return {all, two, three, fg:p(all), p2:p(two), p3:p(three)};
+}
+function pctText(v){ return v===null? '–' : v+'%'; }
+function avgOf(list, key){
+  const vals=list.map(p=>p.st[key]).filter(v=>v!==null);
+  return vals.length? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+}
+function renderFriends(){
+  refreshMyCode();
+  const me={name:myName(), spots:myAggregatedSpots().filter(sp=>sp.attempts>0), me:true};
+  const list=[me, ...friends.map(f=>({name:f.name, spots:f.spots, date:f.date}))]
+    .filter(p=>p.spots.length)
+    .map(p=>({...p, st:statsOf(p.spots)}));
+
+  const wrap=document.getElementById('friendRanking');
+  if(!list.length){
+    wrap.innerHTML='<div class="empty">まだ成績がありません。記録するか、フレンドのコードを追加してください。</div>';
+  }else{
+    list.sort((a,b)=>(b.st.fg??-1)-(a.st.fg??-1));
+    const avg2=avgOf(list,'p2'), avg3=avgOf(list,'p3');
+    wrap.innerHTML = list.map((p,i)=>`
+      <div class="fr-row ${p.me?'me':''}">
+        <div class="rk">${i+1}</div>
+        <div class="nm"><b>${escapeHtml(p.name)}${p.me?' (自分)':''}</b>
+          <div class="sm">FG ${pctText(p.st.fg)} ・ ${p.st.all.m}/${p.st.all.a}本${p.date?' ・ '+new Date(p.date).toLocaleDateString('ja-JP'):''}</div>
+        </div>
+        <div class="sp">2P <b>${pctText(p.st.p2)}</b><br>3P <b>${pctText(p.st.p3)}</b></div>
+        ${p.me?'':`<button class="del" onclick="deleteFriend('${p.name.replace(/'/g,"\\'")}')">🗑</button>`}
+      </div>`).join('')
+      + `<div class="fr-row fr-avg"><div class="rk">–</div>
+           <div class="nm"><b>みんなの平均</b><div class="sm">${list.length}人・記録がある人だけで計算</div></div>
+           <div class="sp">2P <b>${pctText(avg2)}</b><br>3P <b>${pctText(avg3)}</b></div></div>`;
+  }
+
+  const sel=document.getElementById('friendCompareSelect'); const prev=sel.value;
+  sel.innerHTML = friends.length
+    ? friends.map(f=>`<option value="${escapeHtml(f.name)}">${escapeHtml(f.name)} と比較</option>`).join('')
+    : '<option value="">（フレンドを追加すると比較できます）</option>';
+  if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+  renderSpotCompare();
+}
+
+function spotLabel(sp){
+  const side = sp.x<250? '左' : '右';
+  const center = Math.abs(sp.x-250)<60;
+  if(is3(sp)){
+    if(sp.x<CORNER_X+30 || sp.x>500-CORNER_X-30) return `コーナー3（${side}）`;
+    return center? 'トップ3' : `ウイング3（${side}）`;
+  }
+  if(Math.hypot(sp.x-HOOP.x, sp.y-HOOP.y) < 2.4*PXM) return 'ペイント内';
+  if(sp.y > 380) return `ミドルコーナー（${side}）`;
+  return center? 'ミドルトップ' : `ミドルウイング（${side}）`;
+}
+function renderSpotCompare(){
+  const box=document.getElementById('spotCompare');
+  const name=document.getElementById('friendCompareSelect').value;
+  const f=friends.find(x=>x.name===name);
+  if(!f){ box.innerHTML='<div class="empty">フレンドのコードを追加すると、同じ場所どうしを比べられます。</div>'; return; }
+  const mine=myAggregatedSpots().filter(sp=>sp.attempts>0);
+  const rows=[];
+  mine.forEach(sp=>{
+    const m=f.spots.find(o=>Math.hypot(o.x-sp.x,o.y-sp.y)<=HIT_R*1.6);
+    if(m) rows.push({label:spotLabel(sp), me:sp, fr:m});
+  });
+  if(!rows.length){
+    box.innerHTML='<div class="empty">同じ場所の記録が見つかりませんでした。<br>同じメニュー（例：3Pの5ヶ所）で記録すると比較できます。</div>';
+    return;
+  }
+  box.innerHTML = `<div class="cmp-head"><div class="cl">スポット</div><div class="cv">自分</div><div class="cv">${escapeHtml(f.name)}</div><div class="cd">差</div></div>`
+    + rows.map(r=>{
+      const a=pct(r.me.makes,r.me.attempts), b=pct(r.fr.makes,r.fr.attempts), d=a-b;
+      return `<div class="cmp-row">
+        <div class="cl">${r.label}</div>
+        <div class="cv"><b>${a}%</b><br>${r.me.makes}/${r.me.attempts}</div>
+        <div class="cv"><b>${b}%</b><br>${r.fr.makes}/${r.fr.attempts}</div>
+        <div class="cd ${d>0?'win':(d<0?'lose':'')}">${d>0?'+':''}${d}</div>
+      </div>`;
+    }).join('');
 }
 
 /* ---------- マーカー ---------- */
@@ -916,6 +1144,7 @@ function switchView(v){
   document.getElementById('view-'+v).classList.add('active');
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   if(v==='chart') renderChart();
+  if(v==='friends') renderFriends();
   if(v==='history') renderHistory();
   if(v==='record'){ renderSetBar(); renderPresetBar(); renderMenuNote(); renderRecord(); }
 }
@@ -928,10 +1157,12 @@ document.getElementById('sessionName').addEventListener('input', e=>{
 });
 document.getElementById('playerName').addEventListener('input', e=>{
   const s=sessions.find(x=>x.id===currentId); if(s){ s.player=e.target.value; save(); }
+  localStorage.setItem('bball_lastPlayer', e.target.value.trim()); // 次回起動時も同じ名前で使えるように
   renderPlayerList();
 });
 if(sessions.length && tally(sessions[0].spots).a===0) currentId=sessions[0].id;
 if(currentId){ const s=sessions.find(x=>x.id===currentId); if(s){ document.getElementById('playerName').value=s.player||''; document.getElementById('sessionName').value=s.name||''; } }
+if(!document.getElementById('playerName').value) document.getElementById('playerName').value = localStorage.getItem('bball_lastPlayer')||'';
 seedDefaultPresets();
 renderPlayerList(); renderSetBar(); renderPresetBar(); renderMenuNote(); renderRecord();
 </script>
