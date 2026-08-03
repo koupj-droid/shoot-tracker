@@ -42,11 +42,12 @@
   .chips button.active{background:var(--accent); border-color:var(--accent); color:#1a1005;}
 
   /* preset (my area) bar */
-  .preset-bar{display:flex; gap:6px; align-items:center; margin-bottom:12px;}
-  .preset-bar select{flex:1; min-width:0; background:var(--panel2); border:1px solid var(--line);
-    color:var(--text); border-radius:10px; padding:9px 10px; font-size:13px;}
-  .preset-bar .mini{white-space:nowrap; background:var(--panel2); border:1px solid var(--line);
+  .preset-bar{display:flex; gap:6px; align-items:center; margin-bottom:12px; flex-wrap:wrap;}
+  .preset-bar select{flex:1 1 100%; min-width:0; background:var(--panel2); border:1px solid var(--line);
+    color:var(--text); border-radius:10px; padding:10px; font-size:14px;}
+  .preset-bar .mini{flex:1 1 auto; white-space:nowrap; background:var(--panel2); border:1px solid var(--line);
     color:var(--text); border-radius:10px; padding:9px 10px; font-size:13px; font-weight:600;}
+  .preset-bar .mini.icon{flex:0 0 auto; min-width:44px;}
   .preset-bar .mini.rm{color:var(--miss);}
   .preset-bar .mini:active{transform:scale(.96);}
   .menu-note{background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--accent);
@@ -245,10 +246,10 @@
 
   <div class="bar-label">練習メニュー（スポットの配置）</div>
   <div class="preset-bar">
-    <select id="presetSelect" onchange="onPresetSelect()"><option value="">— メニューを選ぶと配置 —</option></select>
+    <select id="presetSelect" onchange="onPresetSelect()"><option value="">メニュー</option></select>
     <button class="mini" onclick="applyPreset()">配置し直す</button>
-    <button class="mini" onclick="openPresetForm('new')">＋この配置をメニュー登録</button>
-    <button class="mini" onclick="openPresetMenu()">⋯</button>
+    <button class="mini" onclick="openPresetForm('new')">＋メニュー登録</button>
+    <button class="mini icon" onclick="openPresetMenu()">⋯</button>
   </div>
 
   <div class="menu-note" id="menuNote" style="display:none"></div>
@@ -518,7 +519,7 @@ function seedDefaultPresets(){
 }
 function renderPresetBar(){
   const sel=document.getElementById('presetSelect'); const prev=sel.value;
-  sel.innerHTML='<option value="">— メニューを選ぶと配置 —</option>'
+  sel.innerHTML='<option value="">メニュー</option>'
     + presets.map(p=>`<option value="${p.id}">${p.name}（${p.spots.length}地点・${p.setSize}本）</option>`).join('');
   if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
 }
@@ -1129,8 +1130,6 @@ function zoneBreakdown(spots){
     {n:'ミッドレンジ', f:s=>!is3(s) && dist(s) >= 2.4*PXM},
     {n:'コーナー3', f:s=>is3(s) && (s.x<CORNER_X+20 || s.x>500-CORNER_X-20)},
     {n:'アーク3', f:s=>is3(s) && !(s.x<CORNER_X+20 || s.x>500-CORNER_X-20)},
-    {n:'左サイド', f:s=>s.x<250},
-    {n:'右サイド', f:s=>s.x>=250},
   ];
   return zones.map(z=>{
     const t=tally(spots,z.f), p=pct(t.m,t.a);
