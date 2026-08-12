@@ -256,7 +256,7 @@
 
   <div class="ocr-bar">
     <button class="ocr-btn" onclick="document.getElementById('ocrFile').click()">📷 写真から数値を自動入力</button>
-    <input type="file" id="ocrFile" accept="image/*" capture="environment" style="display:none" onchange="onOcrFile(event)">
+    <input type="file" id="ocrFile" accept="image/*" style="display:none" onchange="onOcrFile(event)">
   </div>
 
   <div class="court-wrap">
@@ -471,6 +471,11 @@ function currentSession(){
   let s = sessions.find(x=>x.id===currentId);
   if(!s){
     const pn=document.getElementById('playerName');
+    // 新しい練習を始めるとき、名前が空なら前回の名前を自動で戻す
+    if(pn && !pn.value.trim()){
+      const last=(localStorage.getItem('bball_lastPlayer')||'').trim();
+      if(last){ pn.value=last; renderPlayerList(); }
+    }
     s = {id:Date.now(), player:(pn?pn.value.trim():''), name:'', date:new Date().toISOString(), setSize:lastSetSize, spots:[]};
     sessions.unshift(s); currentId = s.id;
   }
@@ -993,9 +998,15 @@ function showOcr(msg,sub){
 function hideOcr(){ document.getElementById('ocrOverlay').classList.remove('open'); }
 
 // Tesseractのword一覧から数字を「上→下・左→右」の読み順で取り出す
+// 数字と紛らわしい文字を数字に直す（S→5 など。欠落してズレるのを防ぐ）
+function normalizeDigits(t){
+  return (t||'').replace(/[SsＳ]/g,'5').replace(/[OoＯ]/g,'0').replace(/[IilＩ|]/g,'1')
+                .replace(/[Bb]/g,'8').replace(/[Zz]/g,'2').replace(/[Gg]/g,'6')
+                .replace(/[Tt]/g,'7').replace(/[Aa]/g,'4').replace(/[qQ]/g,'9');
+}
 function extractOrderedNumbers(words){
   const items=(words||[]).map(w=>{
-    const digits=(w.text||'').replace(/[^0-9]/g,'');
+    const digits=normalizeDigits(w.text).replace(/[^0-9]/g,'');
     const b=w.bbox||{x0:0,x1:0,y0:0,y1:0};
     return {n:parseInt(digits,10), ok:digits.length>0,
       x:(b.x0+b.x1)/2, y:(b.y0+b.y1)/2, h:Math.max(1,b.y1-b.y0)};
@@ -1027,6 +1038,14 @@ function applyOcrNumbers(nums){
     alert('数字を読み取れませんでした。明るく・まっすぐ・大きめに撮ると精度が上がります。手書きは誤認識も出るので、必要ならマークをタップして手入力してください。');
     return;
   }
+  // 個数が合わないときは、別のスポットへズレて入るので必ず確認を取る
+  if(nums.length !== s.spots.length){
+    const msg = `読み取った数字は ${nums.length} 個ですが、スポットは ${s.spots.length} 個です。\n`
+      + `読み取り: ${nums.join(', ')}\n\n`
+      + `このまま入れると、上から順にズレて入る可能性があります。\n続けますか？\n`
+      + `（キャンセルして、マークをタップして手入力するのが確実です）`;
+    if(!confirm(msg)) return;
+  }
   let filled=0;
   s.spots.forEach((sp,i)=>{ if(i<nums.length){ sp.makes=Math.max(0,Math.min(sp.attempts,nums[i])); filled++; } });
   save(); renderRecord();
@@ -1050,7 +1069,9 @@ async function onOcrFile(e){
     worker=await Tesseract.createWorker('eng',1,{
       logger:(m)=>{ if(m.status==='recognizing text'){ showOcr('数字を認識中…', Math.round((m.progress||0)*100)+'%'); } }
     });
-    await worker.setParameters({ tessedit_char_whitelist:'0123456789', tessedit_pageseg_mode:'11' });
+    // PSM 6(均一なテキスト塊)。11では数字が1つも取れなかったため。
+    // 白リストは使わない：5→S のような誤読が丸ごと欠落し、以降のスポットへズレて入るため
+    await worker.setParameters({ tessedit_pageseg_mode:'6' });
     const { data } = await worker.recognize(file);
     const nums = extractOrderedNumbers(data.words);
     hideOcr();
@@ -1216,11 +1237,13 @@ document.getElementById('makesInput').addEventListener('input', e=>setMakesFromI
 document.getElementById('sessionName').addEventListener('input', e=>{
   const s=sessions.find(x=>x.id===currentId); if(s){ s.name=e.target.value; save(); }
 });
-document.getElementById('playerName').addEventListener('input', e=>{
+['input','change'].forEach(ev=>document.getElementById('playerName').addEventListener(ev, e=>{
   const s=sessions.find(x=>x.id===currentId); if(s){ s.player=e.target.value; save(); }
-  localStorage.setItem('bball_lastPlayer', e.target.value.trim()); // 次回起動時も同じ名前で使えるように
+  const v=e.target.value.trim();
+  if(v) localStorage.setItem('bball_lastPlayer', v); // 次回起動時も同じ名前で使えるように
   renderPlayerList();
-});
+  updateSaveStatus();
+}));
 if(sessions.length && tally(sessions[0].spots).a===0) currentId=sessions[0].id;
 if(currentId){ const s=sessions.find(x=>x.id===currentId); if(s){ document.getElementById('playerName').value=s.player||''; document.getElementById('sessionName').value=s.name||''; } }
 if(!document.getElementById('playerName').value) document.getElementById('playerName').value = localStorage.getItem('bball_lastPlayer')||'';
