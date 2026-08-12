@@ -1,6 +1,6 @@
 // シュート記録トラッカー Service Worker
 // インストール可能化＋オフライン対応（データはlocalStorageなので通信不要）
-const CACHE = 'shot-tracker-v1';
+const CACHE = 'shot-tracker-v2';   // 更新時に上げる（古いアイコン等が残らないように）
 const ASSETS = [
   './',
   './index.html',
