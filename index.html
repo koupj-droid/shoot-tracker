@@ -42,17 +42,60 @@
   .chips button.active{background:var(--accent); border-color:var(--accent); color:#1a1005;}
 
   /* preset (my area) bar */
-  .preset-bar{display:flex; gap:6px; align-items:center; margin-bottom:12px;}
-  .preset-bar select{flex:1; min-width:0; background:var(--panel2); border:1px solid var(--line);
-    color:var(--text); border-radius:10px; padding:9px 10px; font-size:13px;}
-  .preset-bar .mini{white-space:nowrap; background:var(--panel2); border:1px solid var(--line);
+  .preset-bar{display:flex; gap:6px; align-items:center; margin-bottom:12px; flex-wrap:wrap;}
+  .preset-bar select{flex:1 1 100%; min-width:0; background:var(--panel2); border:1px solid var(--line);
+    color:var(--text); border-radius:10px; padding:10px; font-size:14px;}
+  .preset-bar .mini{flex:1 1 auto; white-space:nowrap; background:var(--panel2); border:1px solid var(--line);
     color:var(--text); border-radius:10px; padding:9px 10px; font-size:13px; font-weight:600;}
+  .preset-bar .mini.icon{flex:0 0 auto; min-width:44px;}
   .preset-bar .mini.rm{color:var(--miss);}
   .preset-bar .mini:active{transform:scale(.96);}
   .menu-note{background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--accent);
     border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:13px; line-height:1.55; color:var(--text);}
   .menu-note .mn-ico{margin-right:6px;}
   .menu-note .mn-name{font-weight:800; margin-right:8px;}
+
+  /* 保存まわり */
+  .bar-label{font-size:11px; color:var(--sub); margin:0 2px 6px; font-weight:700;}
+  .save-bar{background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:12px; margin:12px 0 8px; text-align:center;}
+  .save-status{font-size:12px; color:var(--make); margin-bottom:10px; font-weight:700;}
+  .save-status.empty{color:var(--sub);}
+  .btn.wide{width:100%; padding:14px 0; font-size:15px; font-weight:800;}
+  .save-hint{font-size:11px; color:var(--sub); margin-top:8px;}
+  .toast{position:fixed; left:50%; bottom:86px; transform:translateX(-50%) translateY(20px);
+    background:var(--panel2); border:1px solid var(--accent); color:var(--text);
+    padding:12px 18px; border-radius:12px; font-size:14px; font-weight:700; z-index:60;
+    opacity:0; pointer-events:none; transition:.25s; box-shadow:0 6px 24px rgba(0,0,0,.5); max-width:88vw;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  /* フレンド */
+  .fr-card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:6px;}
+  .fr-sub{font-size:12px; color:var(--sub); margin-bottom:8px; line-height:1.5;}
+  .codebox{width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:10px; font-size:12px; font-family:ui-monospace,Menlo,monospace;
+    resize:vertical; word-break:break-all;}
+  .codebox:focus{outline:none; border-color:var(--accent);}
+  .fr-row{display:flex; align-items:center; gap:10px; padding:11px 12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; margin-bottom:7px;}
+  .fr-row.me{border-color:var(--accent); background:rgba(255,122,60,.10);}
+  .fr-row .rk{width:22px; font-size:13px; font-weight:800; color:var(--sub); text-align:center;}
+  .fr-row .nm{flex:1; min-width:0;}
+  .fr-row .nm b{font-size:15px;}
+  .fr-row .nm .sm{font-size:11px; color:var(--sub); margin-top:2px;}
+  .fr-row .sp{text-align:right; font-size:12px; color:var(--sub); line-height:1.45; white-space:nowrap;}
+  .fr-row .sp b{font-size:15px; color:var(--text);}
+  .fr-row .del{background:none; border:none; color:var(--sub); font-size:16px; padding:2px 0 2px 4px;}
+  .fr-avg{border-style:dashed; opacity:.9;}
+  .cmp-row{display:flex; align-items:center; gap:8px; padding:10px 12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; margin-bottom:6px; font-size:13px;}
+  .cmp-row .cl{flex:1; min-width:0;}
+  .cmp-row .cv{width:74px; text-align:right; color:var(--sub);}
+  .cmp-row .cv b{color:var(--text);}
+  .cmp-row .cd{width:52px; text-align:right; font-weight:800;}
+  .cmp-row .cd.win{color:var(--make);} .cmp-row .cd.lose{color:var(--miss);}
+  .cmp-head{display:flex; gap:8px; padding:0 12px 6px; font-size:11px; color:var(--sub);}
+  .cmp-head .cl{flex:1;} .cmp-head .cv{width:74px; text-align:right;} .cmp-head .cd{width:52px; text-align:right;}
 
   /* centered modal (form) */
   .modal-scrim{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:45; opacity:0; pointer-events:none; transition:opacity .2s;}
@@ -185,11 +228,12 @@
     <div class="chips" id="setChips"></div>
   </div>
 
+  <div class="bar-label">練習メニュー（スポットの配置）</div>
   <div class="preset-bar">
-    <select id="presetSelect" onchange="onPresetSelect()"><option value="">— メニューを選ぶと配置 —</option></select>
+    <select id="presetSelect" onchange="onPresetSelect()"><option value="">メニュー</option></select>
     <button class="mini" onclick="applyPreset()">配置し直す</button>
-    <button class="mini" onclick="openPresetForm('new')">＋保存</button>
-    <button class="mini" onclick="openPresetMenu()">⋯</button>
+    <button class="mini" onclick="openPresetForm('new')">＋メニュー登録</button>
+    <button class="mini icon" onclick="openPresetMenu()">⋯</button>
   </div>
 
   <div class="menu-note" id="menuNote" style="display:none"></div>
@@ -201,9 +245,15 @@
 
   <div class="stat-grid" id="statGrid"></div>
 
+  <div class="save-bar">
+    <div class="save-status" id="saveStatus">✓ 記録は自動で保存されています</div>
+    <button class="btn accent wide" onclick="finishSession()">✅ この練習を終えて保存</button>
+    <div class="save-hint">押すと履歴に残り、次の練習を新しく始められます（メニューを選ぶと再開）</div>
+  </div>
+
   <div class="actions">
     <button class="btn danger" onclick="undoLastSpot()">↩︎ 直前の地点を取消</button>
-    <button class="btn danger" onclick="clearSession()">現在のセッションを消去</button>
+    <button class="btn danger" onclick="clearSession()">🗑 今の記録を全部消す</button>
   </div>
 </section>
 
@@ -238,6 +288,7 @@
 </section>
 
 <!-- bottom sheet -->
+<div class="toast" id="toast"></div>
 <div class="scrim" id="scrim" onclick="closeSheet()"></div>
 <div class="sheet" id="sheet">
   <div class="sheet-card">
@@ -285,9 +336,41 @@
   <button onclick="closePresetMenu()">閉じる</button>
 </div>
 
+<!-- ===== フレンド ===== -->
+<section class="view" id="view-friends">
+  <div class="section-h">自分のコード</div>
+  <div class="fr-card">
+    <div class="fr-sub" id="myCodeSub">このコードをフレンドに送ると、あなたの成績を見せられます。</div>
+    <textarea id="myCode" class="codebox" rows="3" readonly onclick="this.select()"></textarea>
+    <div class="actions">
+      <button class="btn" onclick="copyMyCode()">📋 コピー</button>
+      <button class="btn" onclick="shareMyCode()">↗︎ 送る</button>
+      <button class="btn" onclick="refreshMyCode()">↻ 更新</button>
+    </div>
+  </div>
+
+  <div class="section-h">フレンドを追加</div>
+  <div class="fr-card">
+    <textarea id="friendCodeInput" class="codebox" rows="3" placeholder="もらったコードをここに貼り付け（ST1…）"></textarea>
+    <div class="actions">
+      <button class="btn accent" onclick="addFriendFromCode()">＋ 追加 / 更新</button>
+      <button class="btn" onclick="pasteFriendCode()">📥 貼り付け</button>
+    </div>
+  </div>
+
+  <div class="section-h">みんなの成績（2P / 3P）</div>
+  <div id="friendRanking"></div>
+
+  <div class="section-h">スポット別の比較</div>
+  <div class="filter-row"><select id="friendCompareSelect" onchange="renderSpotCompare()"></select></div>
+  <div id="spotCompare"></div>
+</section>
+
+
 <nav class="tabs">
   <button class="active" data-view="record" onclick="switchView('record')"><span class="ico">🎯</span>記録</button>
   <button data-view="chart" onclick="switchView('chart')"><span class="ico">📊</span>チャート</button>
+  <button data-view="friends" onclick="switchView('friends')"><span class="ico">👥</span>フレンド</button>
   <button data-view="history" onclick="switchView('history')"><span class="ico">🗂</span>履歴</button>
 </nav>
 
@@ -325,7 +408,8 @@ function el(tag,attrs){
 }
 
 /* ---------- データ ---------- */
-let sessions = load();
+let sessions = load().filter(s=>s.spots.length);   // 空のセッションは残さない
+let lastSetSize = parseInt(localStorage.getItem('bball_lastSetSize'),10) || 20;
 let presets = loadPresets();
 let currentId = null;
 let selectedSpotId = null;
@@ -357,7 +441,13 @@ function rid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 function currentSession(){
   let s = sessions.find(x=>x.id===currentId);
   if(!s){
-    s = {id:Date.now(), player:'', name:'', date:new Date().toISOString(), setSize:20, spots:[]};
+    const pn=document.getElementById('playerName');
+    // 新しい練習を始めるとき、名前が空なら前回の名前を自動で戻す
+    if(pn && !pn.value.trim()){
+      const last=(localStorage.getItem('bball_lastPlayer')||'').trim();
+      if(last){ pn.value=last; renderPlayerList(); }
+    }
+    s = {id:Date.now(), player:(pn?pn.value.trim():''), name:'', date:new Date().toISOString(), setSize:lastSetSize, spots:[]};
     sessions.unshift(s); currentId = s.id;
   }
   if(typeof s.setSize!=='number') s.setSize=20;
@@ -405,7 +495,7 @@ function seedDefaultPresets(){
 }
 function renderPresetBar(){
   const sel=document.getElementById('presetSelect'); const prev=sel.value;
-  sel.innerHTML='<option value="">— メニューを選ぶと配置 —</option>'
+  sel.innerHTML='<option value="">メニュー</option>'
     + presets.map(p=>`<option value="${p.id}">${p.name}（${p.spots.length}地点・${p.setSize}本）</option>`).join('');
   if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
 }
@@ -433,6 +523,8 @@ function applyPreset(){
   if(!p){ alert('メニューを選択してください。'); return; }
   const s=currentSession();
   if(s.spots.length && !confirm('現在の記録を、選んだエリア配置に置き換えますか？（決めた本数は0にリセットされます）')) return;
+  s.player = document.getElementById('playerName').value.trim();
+  s.name   = document.getElementById('sessionName').value.trim();
   s.setSize=p.setSize||s.setSize;
   s.spots=p.spots.map(pt=>({id:rid(), x:pt.x, y:pt.y, makes:0, attempts:s.setSize}));
   selectedSpotId=null;
@@ -539,6 +631,172 @@ function renderPlayerList(){
   dl.innerHTML = uniquePlayers().map(p=>`<option value="${p.replace(/"/g,'&quot;')}">`).join('');
 }
 
+/* ---------- フレンド（コード交換方式・サーバー不要） ---------- */
+let friends = loadFriends();
+function loadFriends(){ try{ return JSON.parse(localStorage.getItem('bball_friends')||'[]'); }catch(e){ return []; } }
+function saveFriends(){ localStorage.setItem('bball_friends', JSON.stringify(friends)); }
+
+function b64enc(str){ let bin=''; new TextEncoder().encode(str).forEach(b=>bin+=String.fromCharCode(b)); return btoa(bin); }
+function b64dec(b64){ const bin=atob(b64); return new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))); }
+
+// 近い座標のスポットをまとめて合算（複数セッション分を1スポットに）
+function mergeSpots(spots){
+  const out=[];
+  spots.forEach(sp=>{
+    const hit=out.find(o=>Math.hypot(o.x-sp.x,o.y-sp.y)<=HIT_R);
+    if(hit){ hit.makes+=sp.makes; hit.attempts+=sp.attempts; }
+    else out.push({x:sp.x, y:sp.y, makes:sp.makes, attempts:sp.attempts});
+  });
+  return out;
+}
+function myName(){ return (document.getElementById('playerName').value||'').trim() || '自分'; }
+function myAggregatedSpots(){
+  const name=(document.getElementById('playerName').value||'').trim();
+  const spots = name ? playerSpots(name) : sessions.reduce((a,s)=>a.concat(s.spots),[]);
+  return mergeSpots(spots);
+}
+
+function makeMyCode(){
+  const spots=myAggregatedSpots().filter(sp=>sp.attempts>0);
+  const payload={v:1, n:myName(), d:Date.now(),
+    s:spots.map(sp=>[Math.round(sp.x), Math.round(sp.y), sp.makes, sp.attempts])};
+  return 'ST1'+b64enc(JSON.stringify(payload)).replace(/=+$/,'');
+}
+function parseCode(code){
+  const c=(code||'').trim().replace(/\s+/g,'');
+  if(!c.startsWith('ST1')) throw new Error('形式が違います');
+  let b=c.slice(3); while(b.length%4) b+='=';
+  const p=JSON.parse(b64dec(b));
+  if(!p || !Array.isArray(p.s)) throw new Error('中身が読めません');
+  return {name:(p.n||'フレンド').slice(0,20), date:p.d||Date.now(),
+    spots:p.s.map(a=>({x:+a[0], y:+a[1], makes:+a[2], attempts:+a[3]}))
+             .filter(sp=>isFinite(sp.x)&&isFinite(sp.y)&&sp.attempts>0)};
+}
+
+function refreshMyCode(){
+  const spots=myAggregatedSpots().filter(sp=>sp.attempts>0);
+  const t=tally(spots);
+  document.getElementById('myCode').value = makeMyCode();
+  document.getElementById('myCodeSub').textContent =
+    spots.length ? `${myName()} の成績（${spots.length}スポット・${t.m}/${t.a}本）。このコードを送ると相手の一覧に並びます。`
+                 : 'まだ記録がありません。記録するとコードに成績が入ります。';
+}
+function copyMyCode(){
+  const el=document.getElementById('myCode');
+  el.select();
+  navigator.clipboard?.writeText(el.value).then(()=>alert('コピーしました。LINEなどで送ってください。'))
+    .catch(()=>{ document.execCommand('copy'); alert('コピーしました。'); });
+}
+function shareMyCode(){
+  const code=document.getElementById('myCode').value;
+  if(navigator.share){ navigator.share({title:'シュート成績', text:code}).catch(()=>{}); }
+  else copyMyCode();
+}
+function pasteFriendCode(){
+  if(!navigator.clipboard?.readText){ alert('貼り付けは、入力欄を長押しして「ペースト」を選んでください。'); return; }
+  navigator.clipboard.readText().then(t=>{ document.getElementById('friendCodeInput').value=t; })
+    .catch(()=>alert('貼り付けできませんでした。入力欄を長押しして「ペースト」を選んでください。'));
+}
+function addFriendFromCode(){
+  const box=document.getElementById('friendCodeInput');
+  let f;
+  try{ f=parseCode(box.value); }
+  catch(e){ alert('コードを読み取れませんでした。\n「ST1」で始まる文字列を全部コピーして貼り付けてください。'); return; }
+  const i=friends.findIndex(x=>x.name===f.name);
+  if(i>=0){ friends[i]=f; } else { friends.push(f); }
+  saveFriends(); box.value='';
+  renderFriends();
+  alert(`${f.name} さんを${i>=0?'更新':'追加'}しました（${f.spots.length}スポット）。`);
+}
+function deleteFriend(name){
+  if(!confirm(`${name} さんを削除しますか？`)) return;
+  friends=friends.filter(f=>f.name!==name); saveFriends(); renderFriends();
+}
+
+function statsOf(spots){
+  const all=tally(spots), two=tally(spots,s=>!is3(s)), three=tally(spots,is3);
+  // 記録がない区分は null（0%扱いにせず「–」表示・平均からも除外）
+  const p=(t)=>t.a? Math.round(t.m/t.a*100) : null;
+  return {all, two, three, fg:p(all), p2:p(two), p3:p(three)};
+}
+function pctText(v){ return v===null? '–' : v+'%'; }
+function avgOf(list, key){
+  const vals=list.map(p=>p.st[key]).filter(v=>v!==null);
+  return vals.length? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+}
+function renderFriends(){
+  refreshMyCode();
+  const me={name:myName(), spots:myAggregatedSpots().filter(sp=>sp.attempts>0), me:true};
+  const list=[me, ...friends.map(f=>({name:f.name, spots:f.spots, date:f.date}))]
+    .filter(p=>p.spots.length)
+    .map(p=>({...p, st:statsOf(p.spots)}));
+
+  const wrap=document.getElementById('friendRanking');
+  if(!list.length){
+    wrap.innerHTML='<div class="empty">まだ成績がありません。記録するか、フレンドのコードを追加してください。</div>';
+  }else{
+    list.sort((a,b)=>(b.st.fg??-1)-(a.st.fg??-1));
+    const avg2=avgOf(list,'p2'), avg3=avgOf(list,'p3');
+    wrap.innerHTML = list.map((p,i)=>`
+      <div class="fr-row ${p.me?'me':''}">
+        <div class="rk">${i+1}</div>
+        <div class="nm"><b>${escapeHtml(p.name)}${p.me?' (自分)':''}</b>
+          <div class="sm">FG ${pctText(p.st.fg)} ・ ${p.st.all.m}/${p.st.all.a}本${p.date?' ・ '+new Date(p.date).toLocaleDateString('ja-JP'):''}</div>
+        </div>
+        <div class="sp">2P <b>${pctText(p.st.p2)}</b><br>3P <b>${pctText(p.st.p3)}</b></div>
+        ${p.me?'':`<button class="del" onclick="deleteFriend('${p.name.replace(/'/g,"\\'")}')">🗑</button>`}
+      </div>`).join('')
+      + `<div class="fr-row fr-avg"><div class="rk">–</div>
+           <div class="nm"><b>みんなの平均</b><div class="sm">${list.length}人・記録がある人だけで計算</div></div>
+           <div class="sp">2P <b>${pctText(avg2)}</b><br>3P <b>${pctText(avg3)}</b></div></div>`;
+  }
+
+  const sel=document.getElementById('friendCompareSelect'); const prev=sel.value;
+  sel.innerHTML = friends.length
+    ? friends.map(f=>`<option value="${escapeHtml(f.name)}">${escapeHtml(f.name)} と比較</option>`).join('')
+    : '<option value="">（フレンドを追加すると比較できます）</option>';
+  if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+  renderSpotCompare();
+}
+
+function spotLabel(sp){
+  const side = sp.x<250? '左' : '右';
+  const center = Math.abs(sp.x-250)<60;
+  if(is3(sp)){
+    if(sp.x<CORNER_X+30 || sp.x>500-CORNER_X-30) return `コーナー3（${side}）`;
+    return center? 'トップ3' : `ウイング3（${side}）`;
+  }
+  if(Math.hypot(sp.x-HOOP.x, sp.y-HOOP.y) < 2.4*PXM) return 'ペイント内';
+  if(sp.y > 380) return `ミドルコーナー（${side}）`;
+  return center? 'ミドルトップ' : `ミドルウイング（${side}）`;
+}
+function renderSpotCompare(){
+  const box=document.getElementById('spotCompare');
+  const name=document.getElementById('friendCompareSelect').value;
+  const f=friends.find(x=>x.name===name);
+  if(!f){ box.innerHTML='<div class="empty">フレンドのコードを追加すると、同じ場所どうしを比べられます。</div>'; return; }
+  const mine=myAggregatedSpots().filter(sp=>sp.attempts>0);
+  const rows=[];
+  mine.forEach(sp=>{
+    const m=f.spots.find(o=>Math.hypot(o.x-sp.x,o.y-sp.y)<=HIT_R*1.6);
+    if(m) rows.push({label:spotLabel(sp), me:sp, fr:m});
+  });
+  if(!rows.length){
+    box.innerHTML='<div class="empty">同じ場所の記録が見つかりませんでした。<br>同じメニュー（例：3Pの5ヶ所）で記録すると比較できます。</div>';
+    return;
+  }
+  box.innerHTML = `<div class="cmp-head"><div class="cl">スポット</div><div class="cv">自分</div><div class="cv">${escapeHtml(f.name)}</div><div class="cd">差</div></div>`
+    + rows.map(r=>{
+      const a=pct(r.me.makes,r.me.attempts), b=pct(r.fr.makes,r.fr.attempts), d=a-b;
+      return `<div class="cmp-row">
+        <div class="cl">${r.label}</div>
+        <div class="cv"><b>${a}%</b><br>${r.me.makes}/${r.me.attempts}</div>
+        <div class="cv"><b>${b}%</b><br>${r.fr.makes}/${r.fr.attempts}</div>
+        <div class="cd ${d>0?'win':(d<0?'lose':'')}">${d>0?'+':''}${d}</div>
+      </div>`;
+    }).join('');
+}
+
 /* ---------- マーカー ---------- */
 function spotMarker(sp, selected){
   const g=el('g',{});
@@ -554,14 +812,17 @@ function spotMarker(sp, selected){
 
 /* ---------- セット本数 ---------- */
 function renderSetBar(){
-  const s = currentSession();
-  document.getElementById('setLabel').textContent = s.setSize;
+  // ここではセッションを作らない（見るだけで空の記録が増えないように）
+  const s = sessions.find(x=>x.id===currentId);
+  const size = s? s.setSize : lastSetSize;
+  document.getElementById('setLabel').textContent = size;
   const wrap=document.getElementById('setChips');
-  const presets = PRESETS.includes(s.setSize)?PRESETS:[...PRESETS, s.setSize].sort((a,b)=>a-b);
-  wrap.innerHTML = presets.map(v=>`<button class="${v===s.setSize?'active':''}" onclick="setSetSize(${v})">${v}本</button>`).join('')
+  const opts = PRESETS.includes(size)?PRESETS:[...PRESETS, size].sort((a,b)=>a-b);
+  wrap.innerHTML = opts.map(v=>`<button class="${v===size?'active':''}" onclick="setSetSize(${v})">${v}本</button>`).join('')
     + `<button onclick="customSetSize()">その他…</button>`;
 }
 function setSetSize(v){
+  lastSetSize=v; localStorage.setItem('bball_lastSetSize', v);
   const s=currentSession();
   s.setSize=v;
   s.spots.forEach(sp=>{ sp.attempts=v; clampMakes(sp); });
@@ -645,6 +906,40 @@ function undoLastSpot(){
   if(selectedSpotId===removed.id) closeSheet();
   else renderRecord();
 }
+/* ---------- 保存まわり ---------- */
+let toastTimer=null;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'), 2600);
+}
+function updateSaveStatus(){
+  const el=document.getElementById('saveStatus'); if(!el) return;
+  const s=sessions.find(x=>x.id===currentId);
+  const t=s? tally(s.spots) : {m:0,a:0};
+  if(t.a>0){
+    const who=(s.player||'').trim();
+    el.className='save-status';
+    el.textContent=`✓ 保存済み${who?'（'+who+'）':''}　${t.m}/${t.a}本 ・ ${pct(t.m,t.a)}%`;
+  }else{
+    el.className='save-status empty';
+    el.textContent='記録するとここに自動で保存されます';
+  }
+}
+function finishSession(){
+  const s=sessions.find(x=>x.id===currentId);
+  const t=s? tally(s.spots) : {m:0,a:0};
+  if(!s || t.a===0){ toast('まだ記録がありません'); return; }
+  const d=new Date(s.date);
+  if(!s.name) s.name=`${d.getMonth()+1}/${d.getDate()} の練習`;
+  save();
+  const label=s.name;
+  // 次の練習へ。ここでは配置しない（打つ前の「0/◯本」が履歴に残らないように）
+  currentId=null; selectedSpotId=null;
+  document.getElementById('sessionName').value='';
+  renderSetBar(); renderPresetBar(); renderMenuNote(); renderRecord();
+  toast(`「${label}」を保存しました（${t.m}/${t.a}本・${pct(t.m,t.a)}%）`);
+}
 function clearSession(){
   const s=sessions.find(x=>x.id===currentId);
   if(!s||!s.spots.length) return;
@@ -661,6 +956,7 @@ function renderRecord(){
   const spots = s?s.spots:[];
   spots.forEach(sp=>svg.appendChild(spotMarker(sp, sp.id===selectedSpotId)));
   document.getElementById('statGrid').innerHTML = statCards(spots);
+  updateSaveStatus();
 }
 function statCards(spots){
   const all=tally(spots), two=tally(spots,s=>!is3(s)), three=tally(spots,is3);
@@ -719,8 +1015,6 @@ function zoneBreakdown(spots){
     {n:'ミッドレンジ', f:s=>!is3(s) && dist(s) >= 2.4*PXM},
     {n:'コーナー3', f:s=>is3(s) && (s.x<CORNER_X+20 || s.x>500-CORNER_X-20)},
     {n:'アーク3', f:s=>is3(s) && !(s.x<CORNER_X+20 || s.x>500-CORNER_X-20)},
-    {n:'左サイド', f:s=>s.x<250},
-    {n:'右サイド', f:s=>s.x>=250},
   ];
   return zones.map(z=>{
     const t=tally(spots,z.f), p=pct(t.m,t.a);
@@ -734,8 +1028,9 @@ function zoneBreakdown(spots){
 /* ---------- 履歴 ---------- */
 function renderHistory(){
   const wrap=document.getElementById('histList');
-  if(!sessions.length){ wrap.innerHTML='<div class="empty">まだ記録がありません。<br>「記録」タブから始めましょう。</div>'; return; }
-  wrap.innerHTML=sessions.map(s=>{
+  const list=sessions.filter(s=>s.spots.length);   // 中身のない練習は出さない
+  if(!list.length){ wrap.innerHTML='<div class="empty">まだ記録がありません。<br>「記録」タブから始めましょう。</div>'; return; }
+  wrap.innerHTML=list.map(s=>{
     const d=new Date(s.date), t=tally(s.spots);
     const name=s.name||`${d.getMonth()+1}/${d.getDate()} のセッション`;
     const who=(s.player||'').trim()? `${s.player.trim()}｜` : '';
@@ -795,6 +1090,7 @@ function switchView(v){
   document.getElementById('view-'+v).classList.add('active');
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   if(v==='chart') renderChart();
+  if(v==='friends') renderFriends();
   if(v==='history') renderHistory();
   if(v==='record'){ renderSetBar(); renderPresetBar(); renderMenuNote(); renderRecord(); }
 }
@@ -805,12 +1101,16 @@ document.getElementById('makesInput').addEventListener('input', e=>setMakesFromI
 document.getElementById('sessionName').addEventListener('input', e=>{
   const s=sessions.find(x=>x.id===currentId); if(s){ s.name=e.target.value; save(); }
 });
-document.getElementById('playerName').addEventListener('input', e=>{
+['input','change'].forEach(ev=>document.getElementById('playerName').addEventListener(ev, e=>{
   const s=sessions.find(x=>x.id===currentId); if(s){ s.player=e.target.value; save(); }
+  const v=e.target.value.trim();
+  if(v) localStorage.setItem('bball_lastPlayer', v); // 次回起動時も同じ名前で使えるように
   renderPlayerList();
-});
+  updateSaveStatus();
+}));
 if(sessions.length && tally(sessions[0].spots).a===0) currentId=sessions[0].id;
 if(currentId){ const s=sessions.find(x=>x.id===currentId); if(s){ document.getElementById('playerName').value=s.player||''; document.getElementById('sessionName').value=s.name||''; } }
+if(!document.getElementById('playerName').value) document.getElementById('playerName').value = localStorage.getItem('bball_lastPlayer')||'';
 seedDefaultPresets();
 renderPlayerList(); renderSetBar(); renderPresetBar(); renderMenuNote(); renderRecord();
 </script>
