@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>シュートトラッカー</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1116">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="シュート記録">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+  :root{
+    --bg:#0f1116; --panel:#181b23; --panel2:#20242e; --line:#2c313d;
+    --text:#f2f4f8; --sub:#9aa3b2; --accent:#ff7a3c;
+    --make:#31c96a; --mid:#f5a524; --miss:#ef4a5a; --none:#6b7280;
+    --court:#c98a4b; --courtline:#f4e3cf;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;}
+  body{max-width:560px; margin:0 auto; padding:0 12px 90px;}
+  header{padding:16px 4px 8px;}
+  header h1{font-size:18px; margin:0; letter-spacing:.02em;}
+  header h1 span{color:var(--accent);}
+  .session-bar{display:flex; gap:8px; align-items:center; margin:6px 0 10px;}
+  .session-bar input{background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:8px 10px; font-size:14px; flex:1; min-width:0;}
+
+  /* set size bar */
+  .set-bar{background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:9px 12px; margin-bottom:12px;}
+  .set-bar .lbl{font-size:12px; color:var(--sub); margin-bottom:7px;}
+  .set-bar .lbl b{color:var(--text); font-size:14px;}
+  .chips{display:flex; gap:6px; flex-wrap:wrap;}
+  .chips button{background:var(--panel2); border:1px solid var(--line); color:var(--sub);
+    border-radius:20px; padding:6px 13px; font-size:13px; font-weight:700;}
+  .chips button.active{background:var(--accent); border-color:var(--accent); color:#1a1005;}
+
+  /* preset (my area) bar */
+  .preset-bar{display:flex; gap:6px; align-items:center; margin-bottom:12px; flex-wrap:wrap;}
+  .preset-bar select{flex:1 1 100%; min-width:0; background:var(--panel2); border:1px solid var(--line);
+    color:var(--text); border-radius:10px; padding:10px; font-size:14px;}
+  .preset-bar .mini{flex:1 1 auto; white-space:nowrap; background:var(--panel2); border:1px solid var(--line);
+    color:var(--text); border-radius:10px; padding:9px 10px; font-size:13px; font-weight:600;}
+  .preset-bar .mini.icon{flex:0 0 auto; min-width:44px;}
+  .preset-bar .mini.rm{color:var(--miss);}
+  .preset-bar .mini:active{transform:scale(.96);}
+  .menu-note{background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--accent);
+    border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:13px; line-height:1.55; color:var(--text);}
+  .menu-note .mn-ico{margin-right:6px;}
+  .menu-note .mn-name{font-weight:800; margin-right:8px;}
+
+  /* OCR (写真から自動入力) */
+  .ocr-bar{margin-bottom:12px;}
+  .ocr-btn{width:100%; background:var(--panel); border:1px dashed var(--accent); color:var(--accent);
+    border-radius:12px; padding:12px; font-size:14px; font-weight:700;}
+  .ocr-btn:active{transform:scale(.99);}
+  .ocr-overlay{position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.62);
+    display:none; align-items:center; justify-content:center;}
+  .ocr-overlay.open{display:flex;}
+  .ocr-box{background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:22px 26px; text-align:center; min-width:220px;}
+  .ocr-spin{width:38px; height:38px; margin:0 auto 12px; border-radius:50%;
+    border:4px solid var(--line); border-top-color:var(--accent); animation:ocrspin .9s linear infinite;}
+  @keyframes ocrspin{to{transform:rotate(360deg);}}
+  .ocr-box #ocrMsg{font-size:14px; color:var(--text);}
+  .ocr-box .ocr-sub{font-size:12px; color:var(--sub); margin-top:6px;}
+
+  /* 保存まわり */
+  .bar-label{font-size:11px; color:var(--sub); margin:0 2px 6px; font-weight:700;}
+  .save-bar{background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:12px; margin:12px 0 8px; text-align:center;}
+  .save-status{font-size:12px; color:var(--make); margin-bottom:10px; font-weight:700;}
+  .save-status.empty{color:var(--sub);}
+  .btn.wide{width:100%; padding:14px 0; font-size:15px; font-weight:800;}
+  .save-hint{font-size:11px; color:var(--sub); margin-top:8px;}
+  .toast{position:fixed; left:50%; bottom:86px; transform:translateX(-50%) translateY(20px);
+    background:var(--panel2); border:1px solid var(--accent); color:var(--text);
+    padding:12px 18px; border-radius:12px; font-size:14px; font-weight:700; z-index:60;
+    opacity:0; pointer-events:none; transition:.25s; box-shadow:0 6px 24px rgba(0,0,0,.5); max-width:88vw;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  /* フレンド */
+  .fr-card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:6px;}
+  .fr-sub{font-size:12px; color:var(--sub); margin-bottom:8px; line-height:1.5;}
+  .codebox{width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:10px; font-size:12px; font-family:ui-monospace,Menlo,monospace;
+    resize:vertical; word-break:break-all;}
+  .codebox:focus{outline:none; border-color:var(--accent);}
+  .fr-row{display:flex; align-items:center; gap:10px; padding:11px 12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; margin-bottom:7px;}
+  .fr-row.me{border-color:var(--accent); background:rgba(255,122,60,.10);}
+  .fr-row .rk{width:22px; font-size:13px; font-weight:800; color:var(--sub); text-align:center;}
+  .fr-row .nm{flex:1; min-width:0;}
+  .fr-row .nm b{font-size:15px;}
+  .fr-row .nm .sm{font-size:11px; color:var(--sub); margin-top:2px;}
+  .fr-row .sp{text-align:right; font-size:12px; color:var(--sub); line-height:1.45; white-space:nowrap;}
+  .fr-row .sp b{font-size:15px; color:var(--text);}
+  .fr-row .del{background:none; border:none; color:var(--sub); font-size:16px; padding:2px 0 2px 4px;}
+  .fr-avg{border-style:dashed; opacity:.9;}
+  .cmp-row{display:flex; align-items:center; gap:8px; padding:10px 12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; margin-bottom:6px; font-size:13px;}
+  .cmp-row .cl{flex:1; min-width:0;}
+  .cmp-row .cv{width:74px; text-align:right; color:var(--sub);}
+  .cmp-row .cv b{color:var(--text);}
+  .cmp-row .cd{width:52px; text-align:right; font-weight:800;}
+  .cmp-row .cd.win{color:var(--make);} .cmp-row .cd.lose{color:var(--miss);}
+  .cmp-head{display:flex; gap:8px; padding:0 12px 6px; font-size:11px; color:var(--sub);}
+  .cmp-head .cl{flex:1;} .cmp-head .cv{width:74px; text-align:right;} .cmp-head .cd{width:52px; text-align:right;}
+
+  /* centered modal (form) */
+  .modal-scrim{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:45; opacity:0; pointer-events:none; transition:opacity .2s;}
+  .modal-scrim.open{opacity:1; pointer-events:auto;}
+  .modal{position:fixed; inset:0; z-index:46; display:flex; align-items:center; justify-content:center; padding:20px; pointer-events:none;}
+  .modal .modal-card{width:100%; max-width:420px; background:var(--panel); border:1px solid var(--line);
+    border-radius:16px; padding:18px; transform:scale(.96); opacity:0; transition:.18s;}
+  .modal.open{pointer-events:auto;}
+  .modal.open .modal-card{transform:scale(1); opacity:1;}
+  .modal-title{font-size:16px; font-weight:800; margin-bottom:14px;}
+  .fld{display:block; font-size:12px; color:var(--sub); margin-bottom:14px;}
+  .fld input,.fld textarea{display:block; width:100%; margin-top:6px; background:var(--panel2);
+    border:1px solid var(--line); color:var(--text); border-radius:10px; padding:10px; font-size:15px;
+    font-family:inherit; resize:vertical;}
+  .fld input:focus,.fld textarea:focus{outline:none; border-color:var(--accent);}
+  .modal-btns{display:flex; gap:8px;}
+  .modal-btns .btn{flex:1; padding:12px 0; text-align:center;}
+  .btn.accent{background:var(--accent); border-color:var(--accent); color:#1a1005;}
+
+  /* bottom pop menu (operations) */
+  .popmenu{position:fixed; left:0; right:0; bottom:0; z-index:46; max-width:560px; margin:0 auto;
+    transform:translateY(110%); transition:transform .2s; pointer-events:none;}
+  .popmenu.open{transform:translateY(0); pointer-events:auto;}
+  .popmenu > button{display:block; width:100%; text-align:left; background:var(--panel); border:none;
+    border-top:1px solid var(--line); color:var(--text); padding:16px 20px; font-size:15px; font-weight:600;}
+  .popmenu > button:first-child{border-radius:16px 16px 0 0;}
+  .popmenu > button.rm{color:var(--miss);}
+
+  .tabs{position:fixed; bottom:0; left:0; right:0; display:flex; background:var(--panel);
+    border-top:1px solid var(--line); max-width:560px; margin:0 auto; z-index:20;}
+  .tabs button{flex:1; background:none; border:none; color:var(--sub); padding:12px 0 16px;
+    font-size:13px; font-weight:600;}
+  .tabs button.active{color:var(--accent);}
+  .tabs .ico{display:block; font-size:20px; margin-bottom:2px;}
+
+  .view{display:none;} .view.active{display:block;}
+
+  .court-wrap{position:relative; background:var(--panel); border-radius:16px; padding:10px; touch-action:manipulation;}
+  svg.court{width:100%; height:auto; display:block; border-radius:10px; touch-action:manipulation;}
+  .hint{text-align:center; color:var(--sub); font-size:12px; margin:8px 0 0; line-height:1.5;}
+
+  .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0;}
+  .stat{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 6px; text-align:center;}
+  .stat .n{font-size:20px; font-weight:800;}
+  .stat .l{font-size:11px; color:var(--sub); margin-top:2px;}
+  .stat.pct .n{color:var(--accent);}
+
+  .actions{display:flex; gap:8px; margin-top:4px;}
+  button.btn{background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600;}
+  button.btn:active{transform:scale(.97);}
+  button.btn.danger{color:var(--miss);}
+
+  .section-h{font-size:13px; font-weight:800; color:var(--sub); margin:18px 2px 8px;}
+  .players .prow{display:flex; align-items:center; gap:10px; padding:11px 12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; margin-bottom:7px;}
+  .players .prow .pn{flex:1; font-size:15px; font-weight:700;}
+  .players .prow .pd{font-size:12px; color:var(--sub);}
+  .players .prow .pp{font-size:20px; font-weight:800; color:var(--accent); width:62px; text-align:right;}
+  .players .empty{padding:20px 0;}
+
+  .zones{margin-top:0;}
+  .zone-row{display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; margin-bottom:7px;}
+  .zone-row .zn{flex:1; font-size:14px;}
+  .zone-row .zv{font-size:13px; color:var(--sub);}
+  .bar{height:7px; border-radius:4px; background:var(--panel2); overflow:hidden; width:90px;}
+  .bar > i{display:block; height:100%; background:var(--accent);}
+
+  .hist-item{background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; margin-bottom:9px; display:flex; align-items:center; gap:12px;}
+  .hist-item .d{flex:1;}
+  .hist-item .d .t{font-weight:700; font-size:15px;}
+  .hist-item .d .s{color:var(--sub); font-size:12px; margin-top:2px;}
+  .hist-item .pc{font-size:20px; font-weight:800; color:var(--accent);}
+  .hist-item .del{background:none; border:none; color:var(--sub); font-size:18px;}
+  .empty{color:var(--sub); text-align:center; padding:40px 0; font-size:14px;}
+
+  .filter-row{display:flex; gap:8px; margin-bottom:12px; align-items:center;}
+  .filter-row select{flex:1; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:9px 10px; font-size:14px;}
+  .legend{display:flex; gap:14px; justify-content:center; margin-top:8px; font-size:12px; color:var(--sub); flex-wrap:wrap;}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle;}
+
+  /* bottom sheet */
+  .sheet{position:fixed; left:0; right:0; bottom:0; z-index:40; max-width:560px; margin:0 auto;
+    transform:translateY(110%); transition:transform .2s ease; pointer-events:none;}
+  .sheet.open{transform:translateY(0); pointer-events:auto;}
+  .sheet-card{background:var(--panel); border:1px solid var(--line); border-bottom:none;
+    border-radius:18px 18px 0 0; padding:16px 18px 24px; box-shadow:0 -8px 30px rgba(0,0,0,.5);}
+  .sheet-title{color:var(--sub); font-size:13px; text-align:center; margin-bottom:12px;}
+  .stepper{display:flex; align-items:center; justify-content:center; gap:16px;}
+  .stepper .st{width:58px; height:58px; border-radius:50%; border:2px solid var(--line);
+    background:var(--panel2); color:var(--text); font-size:28px; font-weight:800; line-height:1;}
+  .stepper .st:active{transform:scale(.94);}
+  .makes{display:flex; align-items:baseline; gap:6px;}
+  .makes input{width:96px; background:var(--panel2); border:2px solid var(--line);
+    border-radius:12px; color:var(--make); font-size:48px; font-weight:800; text-align:center;
+    padding:2px 4px; -moz-appearance:textfield;}
+  .makes input:focus{outline:none; border-color:var(--accent);}
+  .makes input::-webkit-outer-spin-button,.makes input::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+  .makes .den{font-size:26px; color:var(--sub); font-weight:800;}
+  .sheet-pct{text-align:center; font-size:18px; font-weight:800; color:var(--accent); margin-top:8px; min-height:22px;}
+  .sheet-sub{display:flex; gap:8px; margin-top:14px;}
+  .sheet-sub button{flex:1; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:12px 0; font-size:14px; font-weight:600;}
+  .sheet-sub button.rm{color:var(--miss);}
+  .scrim{position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:35; opacity:0; pointer-events:none; transition:opacity .2s;}
+  .scrim.open{opacity:1; pointer-events:auto;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏀 シュート<span>トラッカー</span></h1>
+</header>
+
+<div class="session-bar">
+  <input id="playerName" type="text" placeholder="打つ人の名前（例：田中）" list="playerList" autocomplete="off">
+  <datalist id="playerList"></datalist>
+</div>
+<div class="session-bar">
+  <input id="sessionName" type="text" placeholder="セッション名（例：7/25 シューティング練）">
+</div>
+
+<!-- ===== 記録 ===== -->
+<section class="view active" id="view-record">
+  <div class="set-bar">
+    <div class="lbl">1セットの本数：<b id="setLabel">20</b>本（各地点でこの本数中、何本決めたかを入力）</div>
+    <div class="chips" id="setChips"></div>
+  </div>
+
+  <div class="bar-label">練習メニュー（スポットの配置）</div>
+  <div class="preset-bar">
+    <select id="presetSelect" onchange="onPresetSelect()"><option value="">メニュー</option></select>
+    <button class="mini" onclick="applyPreset()">配置し直す</button>
+    <button class="mini" onclick="openPresetForm('new')">＋メニュー登録</button>
+    <button class="mini icon" onclick="openPresetMenu()">⋯</button>
+  </div>
+
+  <div class="menu-note" id="menuNote" style="display:none"></div>
+
+  <div class="ocr-bar">
+    <button class="ocr-btn" onclick="document.getElementById('ocrFile').click()">📷 写真から数値を自動入力</button>
+    <input type="file" id="ocrFile" accept="image/*" style="display:none" onchange="onOcrFile(event)">
+  </div>
+
+  <div class="court-wrap">
+    <svg class="court" id="courtRecord" viewBox="0 0 500 470"></svg>
+    <p class="hint">コート上の地点をタップ → 決めた本数を入力（例：20本中15本なら「15」）。<br>マーカーの数字は「決めた本数／セット本数」。既存の地点はタップで再編集できます。</p>
+  </div>
+
+  <div class="stat-grid" id="statGrid"></div>
+
+  <div class="save-bar">
+    <div class="save-status" id="saveStatus">✓ 記録は自動で保存されています</div>
+    <button class="btn accent wide" onclick="finishSession()">✅ この練習を終えて保存</button>
+    <div class="save-hint">押すと履歴に残り、次の練習を新しく始められます（メニューを選ぶと再開）</div>
+  </div>
+
+  <div class="actions">
+    <button class="btn danger" onclick="undoLastSpot()">↩︎ 直前の地点を取消</button>
+    <button class="btn danger" onclick="clearSession()">🗑 今の記録を全部消す</button>
+  </div>
+</section>
+
+<!-- ===== チャート ===== -->
+<section class="view" id="view-chart">
+  <div class="filter-row">
+    <select id="chartFilter" onchange="renderChart()"></select>
+  </div>
+  <div class="court-wrap">
+    <svg class="court" id="courtChart" viewBox="0 0 500 470"></svg>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--make)"></i>70%以上</span>
+    <span><i style="background:var(--mid)"></i>50〜69%</span>
+    <span><i style="background:var(--miss)"></i>49%以下</span>
+  </div>
+  <div class="stat-grid" id="chartStat"></div>
+  <div class="section-h">選手別成績</div>
+  <div class="players" id="playerStats"></div>
+  <div class="section-h">ゾーン別成功率</div>
+  <div class="zones" id="zoneStats"></div>
+</section>
+
+<!-- ===== 履歴 ===== -->
+<section class="view" id="view-history">
+  <div id="histList"></div>
+  <div class="actions" style="margin-top:10px;">
+    <button class="btn" onclick="exportData()">データ書き出し</button>
+    <button class="btn" onclick="document.getElementById('importFile').click()">読み込み</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
+  </div>
+</section>
+
+<!-- bottom sheet -->
+<div class="toast" id="toast"></div>
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-card">
+    <div class="sheet-title" id="sheetTitle">この地点で決めた本数を入力</div>
+    <div class="stepper">
+      <button class="st" onclick="bump(-1)">−</button>
+      <div class="makes">
+        <input id="makesInput" type="number" inputmode="numeric" pattern="[0-9]*" min="0" value="0" onfocus="this.select()">
+        <span class="den">/ <span id="denom">20</span></span>
+      </div>
+      <button class="st" onclick="bump(1)">＋</button>
+    </div>
+    <div class="sheet-pct" id="sheetPct"></div>
+    <div class="sheet-sub">
+      <button class="rm" onclick="deleteSpot()">🗑 この地点を削除</button>
+      <button onclick="closeSheet()">完了</button>
+    </div>
+  </div>
+</div>
+
+<!-- マイエリア 入力フォーム -->
+<div class="modal-scrim" id="formScrim" onclick="closePresetForm()"></div>
+<div class="modal" id="presetForm">
+  <div class="modal-card">
+    <div class="modal-title" id="presetFormTitle">マイエリアを保存</div>
+    <label class="fld">名前
+      <input id="pfName" type="text" placeholder="例：5スポットシューティング">
+    </label>
+    <label class="fld">練習メニュー（メモ・任意）
+      <textarea id="pfMenu" rows="4" placeholder="例：各スポット20本。コーナー→ウイング→トップの順に時計回り。"></textarea>
+    </label>
+    <div class="modal-btns">
+      <button class="btn" onclick="closePresetForm()">キャンセル</button>
+      <button class="btn accent" onclick="submitPresetForm()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- マイエリア 操作メニュー -->
+<div class="modal-scrim" id="menuScrim" onclick="closePresetMenu()"></div>
+<div class="popmenu" id="presetMenu">
+  <button onclick="editPreset()">✏️ 名前・メニューを編集</button>
+  <button onclick="duplicatePreset()">📋 複製</button>
+  <button class="rm" onclick="deletePreset()">🗑 削除</button>
+  <button onclick="closePresetMenu()">閉じる</button>
+</div>
+
+<!-- ===== フレンド ===== -->
+<section class="view" id="view-friends">
+  <div class="section-h">自分のコード</div>
+  <div class="fr-card">
+    <div class="fr-sub" id="myCodeSub">このコードをフレンドに送ると、あなたの成績を見せられます。</div>
+    <textarea id="myCode" class="codebox" rows="3" readonly onclick="this.select()"></textarea>
+    <div class="actions">
+      <button class="btn" onclick="copyMyCode()">📋 コピー</button>
+      <button class="btn" onclick="shareMyCode()">↗︎ 送る</button>
+      <button class="btn" onclick="refreshMyCode()">↻ 更新</button>
+    </div>
+  </div>
+
+  <div class="section-h">フレンドを追加</div>
+  <div class="fr-card">
+    <textarea id="friendCodeInput" class="codebox" rows="3" placeholder="もらったコードをここに貼り付け（ST1…）"></textarea>
+    <div class="actions">
+      <button class="btn accent" onclick="addFriendFromCode()">＋ 追加 / 更新</button>
+      <button class="btn" onclick="pasteFriendCode()">📥 貼り付け</button>
+    </div>
+  </div>
+
+  <div class="section-h">みんなの成績（2P / 3P）</div>
+  <div id="friendRanking"></div>
+
+  <div class="section-h">スポット別の比較</div>
+  <div class="filter-row"><select id="friendCompareSelect" onchange="renderSpotCompare()"></select></div>
+  <div id="spotCompare"></div>
+</section>
+
+<!-- OCR 進捗オーバーレイ -->
+<div class="ocr-overlay" id="ocrOverlay">
+  <div class="ocr-box">
+    <div class="ocr-spin"></div>
+    <div id="ocrMsg">解析中…</div>
+    <div class="ocr-sub" id="ocrSub">写真から数字を読み取っています</div>
+  </div>
+</div>
+
+<nav class="tabs">
+  <button class="active" data-view="record" onclick="switchView('record')"><span class="ico">🎯</span>記録</button>
+  <button data-view="chart" onclick="switchView('chart')"><span class="ico">📊</span>チャート</button>
+  <button data-view="friends" onclick="switchView('friends')"><span class="ico">👥</span>フレンド</button>
+  <button data-view="history" onclick="switchView('history')"><span class="ico">🗂</span>履歴</button>
+</nav>
+
+<script>
+/* ---------- コート寸法（px, 33.3px = 1m 相当） ---------- */
+const HOOP = {x:250, y:418};
+const PXM = 33.3;
+const R3 = 6.75 * PXM;
+const CORNER_X = 0.9 * PXM;
+const HIT_R = 22;
+const PRESETS = [5,10,15,20,30,50];
+
+/* ---------- コート描画 ---------- */
+function drawCourt(svg){
+  svg.innerHTML='';
+  svg.appendChild(el('rect',{x:0,y:0,width:500,height:470,fill:'var(--court)',rx:6}));
+  const L={fill:'none',stroke:'var(--courtline)','stroke-width':2.5};
+  svg.appendChild(el('rect',{x:14,y:8,width:472,height:462,...L}));
+  const laneW=4.9*PXM, laneTop=470-5.8*PXM;
+  svg.appendChild(el('rect',{x:250-laneW/2,y:laneTop,width:laneW,height:(470-8)-laneTop,...L}));
+  svg.appendChild(el('circle',{cx:250,cy:laneTop,r:1.8*PXM,...L}));
+  svg.appendChild(el('line',{x1:250-0.9*PXM,y1:470-1.2*PXM,x2:250+0.9*PXM,y2:470-1.2*PXM,stroke:'var(--courtline)','stroke-width':3}));
+  svg.appendChild(el('circle',{cx:HOOP.x,cy:HOOP.y,r:0.23*PXM,fill:'none',stroke:'#ff5b2e','stroke-width':2.5}));
+  // コーナー直線がアークに接続するyを、リング中心からの半径R3で正しく求める
+  const cornerTopY = HOOP.y - Math.sqrt(Math.max(0, R3*R3 - (HOOP.x-CORNER_X)**2));
+  svg.appendChild(el('line',{x1:CORNER_X,y1:470-8,x2:CORNER_X,y2:cornerTopY,...L}));
+  svg.appendChild(el('line',{x1:500-CORNER_X,y1:470-8,x2:500-CORNER_X,y2:cornerTopY,...L}));
+  svg.appendChild(el('path',{d:`M ${CORNER_X} ${cornerTopY} A ${R3} ${R3} 0 0 1 ${500-CORNER_X} ${cornerTopY}`,...L}));
+  svg.appendChild(el('path',{d:`M ${250-1.8*PXM} 8 A ${1.8*PXM} ${1.8*PXM} 0 0 1 ${250+1.8*PXM} 8`,...L}));
+}
+function el(tag,attrs){
+  const e=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  return e;
+}
+
+/* ---------- データ ---------- */
+let sessions = load().filter(s=>s.spots.length);   // 空のセッションは残さない
+let lastSetSize = parseInt(localStorage.getItem('bball_lastSetSize'),10) || 20;
+let presets = loadPresets();
+let currentId = null;
+let selectedSpotId = null;
+
+function load(){
+  let data;
+  try{ data = JSON.parse(localStorage.getItem('bball_shots')||'[]'); }
+  catch(e){ return []; }
+  data.forEach(s=>{
+    if(typeof s.setSize!=='number') s.setSize = 20;
+    if(!s.spots){
+      // 旧「1タップ=1本」形式からの移行
+      s.spots = (s.shots||[]).map(sh=>({id:rid(), x:sh.x, y:sh.y, makes:(sh.made?1:0), attempts:1}));
+      delete s.shots; delete s.log;
+    }
+    s.spots.forEach(sp=>{
+      if(Array.isArray(sp.made)){ // 「成功/失敗を積み上げ」形式からの移行
+        sp.makes = sp.made.filter(Boolean).length; sp.attempts = sp.made.length; delete sp.made;
+      }
+      if(typeof sp.attempts!=='number' || sp.attempts<1) sp.attempts = s.setSize;
+      if(typeof sp.makes!=='number') sp.makes = 0;
+    });
+  });
+  return data;
+}
+function save(){ localStorage.setItem('bball_shots', JSON.stringify(sessions)); }
+function rid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+function currentSession(){
+  let s = sessions.find(x=>x.id===currentId);
+  if(!s){
+    const pn=document.getElementById('playerName');
+    // 新しい練習を始めるとき、名前が空なら前回の名前を自動で戻す
+    if(pn && !pn.value.trim()){
+      const last=(localStorage.getItem('bball_lastPlayer')||'').trim();
+      if(last){ pn.value=last; renderPlayerList(); }
+    }
+    s = {id:Date.now(), player:(pn?pn.value.trim():''), name:'', date:new Date().toISOString(), setSize:lastSetSize, spots:[]};
+    sessions.unshift(s); currentId = s.id;
+  }
+  if(typeof s.setSize!=='number') s.setSize=20;
+  return s;
+}
+function clampMakes(sp){ if(sp.makes<0)sp.makes=0; if(sp.makes>sp.attempts)sp.makes=sp.attempts; }
+
+/* ---------- マイエリア（お気に入り配置） ---------- */
+function loadPresets(){ try{ return JSON.parse(localStorage.getItem('bball_presets')||'[]'); }catch(e){ return []; } }
+function savePresets(){ localStorage.setItem('bball_presets', JSON.stringify(presets)); }
+
+/* デフォルトのシュートエリアを用意（バージョン更新時は同名の旧デフォルトを入れ替え、自作は残す） */
+const SEED_VERSION='4';
+const LEGACY_PRESET_NAMES=['ミドルコーナー・エルボー・フリースロー（5ヶ所）']; // 旧デフォルト（差し替え対象）
+function seedDefaultPresets(){
+  if(localStorage.getItem('bball_seeded')===SEED_VERSION) return;
+  const P1=[  // コーナー・ウイング・トップ（すべて3Pラインの外側の5ヶ所）
+    {x:27,y:440},   // 左コーナー3
+    {x:73,y:241},   // 左ウイング3（ライン外）
+    {x:250,y:168},  // トップ3（ライン外）
+    {x:427,y:241},  // 右ウイング3（ライン外）
+    {x:473,y:440}   // 右コーナー3
+  ];
+  const P2=[  // ミドルコーナー・ミドルウイング・ミドルトップ（上を内側に寄せたミドルの5ヶ所）
+    {x:100,y:445},  // 左ミドルコーナー
+    {x:144,y:312},  // 左ミドルウイング
+    {x:250,y:255},  // ミドルトップ
+    {x:356,y:312},  // 右ミドルウイング
+    {x:400,y:445}   // 右ミドルコーナー
+  ];
+  const P3=[...P1,...P2]; // 全10ヶ所
+  const defs=[
+    {name:'コーナー・ウイング・トップ（5ヶ所）',
+     menu:'3Pの5スポット。左右コーナー／左右ウイング／トップ。各10本。', setSize:10, spots:P1},
+    {name:'ミドルコーナー・ミドルウイング・ミドルトップ（5ヶ所）',
+     menu:'ミドルの5スポット。左右ミドルコーナー／左右ミドルウイング／ミドルトップ。各10本。', setSize:10, spots:P2},
+    {name:'全10ヶ所（3P＋ミドル）',
+     menu:'上の2メニューを合わせた10スポット。各10本。', setSize:10, spots:P3}
+  ];
+  const remove=[...defs.map(d=>d.name), ...LEGACY_PRESET_NAMES];
+  presets = presets.filter(p=>!remove.includes(p.name));          // 旧デフォルトを除去
+  presets = [...defs.map(d=>({id:rid(), ...d})), ...presets];     // 新デフォルトを先頭に
+  savePresets();
+  localStorage.setItem('bball_seeded', SEED_VERSION);
+}
+function renderPresetBar(){
+  const sel=document.getElementById('presetSelect'); const prev=sel.value;
+  sel.innerHTML='<option value="">メニュー</option>'
+    + presets.map(p=>`<option value="${p.id}">${p.name}（${p.spots.length}地点・${p.setSize}本）</option>`).join('');
+  if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+}
+function selectedPreset(){ return presets.find(x=>x.id===document.getElementById('presetSelect').value); }
+function escapeHtml(t){ return (t||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])).replace(/\n/g,'<br>'); }
+
+/* 呼び出した練習メニューをコート上に表示 */
+function renderMenuNote(){
+  const note=document.getElementById('menuNote');
+  const p=selectedPreset();
+  if(p && (p.menu || p.name)){
+    note.style.display='block';
+    note.innerHTML = `<span class="mn-ico">📋</span><span class="mn-name">${escapeHtml(p.name)}</span>`
+      + (p.menu ? escapeHtml(p.menu) : '<span style="color:var(--sub)">（メニュー未設定）</span>');
+  } else { note.style.display='none'; }
+}
+
+/* メニューを選んだら自動でスポットを配置（あとは数字を打つだけ） */
+function onPresetSelect(){
+  renderMenuNote();
+  if(selectedPreset()) applyPreset();
+}
+function applyPreset(){
+  const p=selectedPreset();
+  if(!p){ alert('メニューを選択してください。'); return; }
+  const s=currentSession();
+  if(s.spots.length && !confirm('現在の記録を、選んだエリア配置に置き換えますか？（決めた本数は0にリセットされます）')) return;
+  s.player = document.getElementById('playerName').value.trim();
+  s.name   = document.getElementById('sessionName').value.trim();
+  s.setSize=p.setSize||s.setSize;
+  s.spots=p.spots.map(pt=>({id:rid(), x:pt.x, y:pt.y, makes:0, attempts:s.setSize}));
+  selectedSpotId=null;
+  save(); renderSetBar(); renderRecord(); renderMenuNote();
+}
+
+/* ---- 入力フォーム（保存・編集） ---- */
+let formMode='new', formPresetId=null;
+function openPresetForm(mode, id){
+  formMode=mode; formPresetId=id||null;
+  const nameEl=document.getElementById('pfName'), menuEl=document.getElementById('pfMenu');
+  if(mode==='new'){
+    const s=currentSession();
+    if(!s.spots.length){ alert('保存する地点がありません。先にコートに地点を配置してください。'); return; }
+    document.getElementById('presetFormTitle').textContent='マイエリアを保存（'+s.spots.length+'地点・'+s.setSize+'本）';
+    nameEl.value = s.name || ('配置'+(presets.length+1));
+    menuEl.value = '';
+  }else{
+    const p=presets.find(x=>x.id===id); if(!p) return;
+    document.getElementById('presetFormTitle').textContent='マイエリアを編集';
+    nameEl.value=p.name; menuEl.value=p.menu||'';
+  }
+  document.getElementById('presetForm').classList.add('open');
+  document.getElementById('formScrim').classList.add('open');
+  nameEl.focus(); nameEl.select();
+}
+function closePresetForm(){
+  document.getElementById('presetForm').classList.remove('open');
+  document.getElementById('formScrim').classList.remove('open');
+}
+function submitPresetForm(){
+  const name=document.getElementById('pfName').value.trim();
+  const menu=document.getElementById('pfMenu').value.trim();
+  if(!name){ alert('名前を入力してください。'); return; }
+  if(formMode==='new'){
+    const s=currentSession();
+    const p={id:rid(), name, menu, setSize:s.setSize, spots:s.spots.map(sp=>({x:sp.x,y:sp.y}))};
+    presets.push(p); savePresets(); renderPresetBar();
+    document.getElementById('presetSelect').value=p.id;
+  }else{
+    const p=presets.find(x=>x.id===formPresetId);
+    if(p){ p.name=name; p.menu=menu; savePresets(); renderPresetBar();
+      document.getElementById('presetSelect').value=p.id; }
+  }
+  closePresetForm(); renderMenuNote();
+}
+
+/* ---- 操作メニュー（編集・複製・削除） ---- */
+function openPresetMenu(){
+  if(!selectedPreset()){ alert('操作するマイエリアを選択してください。'); return; }
+  document.getElementById('presetMenu').classList.add('open');
+  document.getElementById('menuScrim').classList.add('open');
+}
+function closePresetMenu(){
+  document.getElementById('presetMenu').classList.remove('open');
+  document.getElementById('menuScrim').classList.remove('open');
+}
+function editPreset(){
+  const p=selectedPreset(); if(!p) return;
+  closePresetMenu(); openPresetForm('edit', p.id);
+}
+function duplicatePreset(){
+  const p=selectedPreset(); if(!p) return;
+  const copy={id:rid(), name:p.name+' のコピー', menu:p.menu||'', setSize:p.setSize, spots:p.spots.map(pt=>({x:pt.x,y:pt.y}))};
+  presets.push(copy); savePresets(); renderPresetBar();
+  document.getElementById('presetSelect').value=copy.id;
+  closePresetMenu(); renderMenuNote();
+}
+function deletePreset(){
+  const p=selectedPreset(); if(!p) return;
+  if(!confirm(`マイエリア「${p.name}」を削除しますか？`)) return;
+  presets=presets.filter(x=>x.id!==p.id); savePresets(); renderPresetBar();
+  closePresetMenu(); renderMenuNote();
+}
+
+/* ---------- 集計 ---------- */
+function spotPct(sp){ return sp.attempts ? Math.round(sp.makes/sp.attempts*100) : null; }
+function pct(m,a){ return a? Math.round(m/a*100):0; }
+function colorFor(p){ if(p===null) return 'var(--none)'; if(p>=70) return 'var(--make)'; if(p>=50) return 'var(--mid)'; return 'var(--miss)'; }
+function tally(spots, filt){
+  let m=0,a=0;
+  spots.forEach(s=>{ if(!filt||filt(s)){ a+=s.attempts; m+=s.makes; } });
+  return {m,a};
+}
+function is3(sp){
+  const d=Math.hypot(sp.x-HOOP.x, sp.y-HOOP.y);
+  const corner = (sp.x<CORNER_X || sp.x>500-CORNER_X); // コーナーの直線ライン外側は3P
+  return corner || d >= R3;
+}
+
+/* ---------- 選手（打つ人）別 ---------- */
+function uniquePlayers(){
+  const list=[];
+  sessions.forEach(s=>{ const p=(s.player||'').trim(); if(p && !list.includes(p)) list.push(p); });
+  return list;
+}
+function playerSpots(name){
+  let arr=[];
+  sessions.forEach(s=>{ if((s.player||'').trim()===name) arr.push(...s.spots); });
+  return arr;
+}
+function renderPlayerList(){
+  const dl=document.getElementById('playerList');
+  dl.innerHTML = uniquePlayers().map(p=>`<option value="${p.replace(/"/g,'&quot;')}">`).join('');
+}
+
+/* ---------- フレンド（コード交換方式・サーバー不要） ---------- */
+let friends = loadFriends();
+function loadFriends(){ try{ return JSON.parse(localStorage.getItem('bball_friends')||'[]'); }catch(e){ return []; } }
+function saveFriends(){ localStorage.setItem('bball_friends', JSON.stringify(friends)); }
+
+function b64enc(str){ let bin=''; new TextEncoder().encode(str).forEach(b=>bin+=String.fromCharCode(b)); return btoa(bin); }
+function b64dec(b64){ const bin=atob(b64); return new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))); }
+
+// 近い座標のスポットをまとめて合算（複数セッション分を1スポットに）
+function mergeSpots(spots){
+  const out=[];
+  spots.forEach(sp=>{
+    const hit=out.find(o=>Math.hypot(o.x-sp.x,o.y-sp.y)<=HIT_R);
+    if(hit){ hit.makes+=sp.makes; hit.attempts+=sp.attempts; }
+    else out.push({x:sp.x, y:sp.y, makes:sp.makes, attempts:sp.attempts});
+  });
+  return out;
+}
+function myName(){ return (document.getElementById('playerName').value||'').trim() || '自分'; }
+function myAggregatedSpots(){
+  const name=(document.getElementById('playerName').value||'').trim();
+  const spots = name ? playerSpots(name) : sessions.reduce((a,s)=>a.concat(s.spots),[]);
+  return mergeSpots(spots);
+}
+
+function makeMyCode(){
+  const spots=myAggregatedSpots().filter(sp=>sp.attempts>0);
+  const payload={v:1, n:myName(), d:Date.now(),
+    s:spots.map(sp=>[Math.round(sp.x), Math.round(sp.y), sp.makes, sp.attempts])};
+  return 'ST1'+b64enc(JSON.stringify(payload)).replace(/=+$/,'');
+}
+function parseCode(code){
+  const c=(code||'').trim().replace(/\s+/g,'');
+  if(!c.startsWith('ST1')) throw new Error('形式が違います');
+  let b=c.slice(3); while(b.length%4) b+='=';
+  const p=JSON.parse(b64dec(b));
+  if(!p || !Array.isArray(p.s)) throw new Error('中身が読めません');
+  return {name:(p.n||'フレンド').slice(0,20), date:p.d||Date.now(),
+    spots:p.s.map(a=>({x:+a[0], y:+a[1], makes:+a[2], attempts:+a[3]}))
+             .filter(sp=>isFinite(sp.x)&&isFinite(sp.y)&&sp.attempts>0)};
+}
+
+function refreshMyCode(){
+  const spots=myAggregatedSpots().filter(sp=>sp.attempts>0);
+  const t=tally(spots);
+  document.getElementById('myCode').value = makeMyCode();
+  document.getElementById('myCodeSub').textContent =
+    spots.length ? `${myName()} の成績（${spots.length}スポット・${t.m}/${t.a}本）。このコードを送ると相手の一覧に並びます。`
+                 : 'まだ記録がありません。記録するとコードに成績が入ります。';
+}
+function copyMyCode(){
+  const el=document.getElementById('myCode');
+  el.select();
+  navigator.clipboard?.writeText(el.value).then(()=>alert('コピーしました。LINEなどで送ってください。'))
+    .catch(()=>{ document.execCommand('copy'); alert('コピーしました。'); });
+}
+function shareMyCode(){
+  const code=document.getElementById('myCode').value;
+  if(navigator.share){ navigator.share({title:'シュート成績', text:code}).catch(()=>{}); }
+  else copyMyCode();
+}
+function pasteFriendCode(){
+  if(!navigator.clipboard?.readText){ alert('貼り付けは、入力欄を長押しして「ペースト」を選んでください。'); return; }
+  navigator.clipboard.readText().then(t=>{ document.getElementById('friendCodeInput').value=t; })
+    .catch(()=>alert('貼り付けできませんでした。入力欄を長押しして「ペースト」を選んでください。'));
+}
+function addFriendFromCode(){
+  const box=document.getElementById('friendCodeInput');
+  let f;
+  try{ f=parseCode(box.value); }
+  catch(e){ alert('コードを読み取れませんでした。\n「ST1」で始まる文字列を全部コピーして貼り付けてください。'); return; }
+  const i=friends.findIndex(x=>x.name===f.name);
+  if(i>=0){ friends[i]=f; } else { friends.push(f); }
+  saveFriends(); box.value='';
+  renderFriends();
+  alert(`${f.name} さんを${i>=0?'更新':'追加'}しました（${f.spots.length}スポット）。`);
+}
+function deleteFriend(name){
+  if(!confirm(`${name} さんを削除しますか？`)) return;
+  friends=friends.filter(f=>f.name!==name); saveFriends(); renderFriends();
+}
+
+function statsOf(spots){
+  const all=tally(spots), two=tally(spots,s=>!is3(s)), three=tally(spots,is3);
+  // 記録がない区分は null（0%扱いにせず「–」表示・平均からも除外）
+  const p=(t)=>t.a? Math.round(t.m/t.a*100) : null;
+  return {all, two, three, fg:p(all), p2:p(two), p3:p(three)};
+}
+function pctText(v){ return v===null? '–' : v+'%'; }
+function avgOf(list, key){
+  const vals=list.map(p=>p.st[key]).filter(v=>v!==null);
+  return vals.length? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+}
+function renderFriends(){
+  refreshMyCode();
+  const me={name:myName(), spots:myAggregatedSpots().filter(sp=>sp.attempts>0), me:true};
+  const list=[me, ...friends.map(f=>({name:f.name, spots:f.spots, date:f.date}))]
+    .filter(p=>p.spots.length)
+    .map(p=>({...p, st:statsOf(p.spots)}));
+
+  const wrap=document.getElementById('friendRanking');
+  if(!list.length){
+    wrap.innerHTML='<div class="empty">まだ成績がありません。記録するか、フレンドのコードを追加してください。</div>';
+  }else{
+    list.sort((a,b)=>(b.st.fg??-1)-(a.st.fg??-1));
+    const avg2=avgOf(list,'p2'), avg3=avgOf(list,'p3');
+    wrap.innerHTML = list.map((p,i)=>`
+      <div class="fr-row ${p.me?'me':''}">
+        <div class="rk">${i+1}</div>
+        <div class="nm"><b>${escapeHtml(p.name)}${p.me?' (自分)':''}</b>
+          <div class="sm">FG ${pctText(p.st.fg)} ・ ${p.st.all.m}/${p.st.all.a}本${p.date?' ・ '+new Date(p.date).toLocaleDateString('ja-JP'):''}</div>
+        </div>
+        <div class="sp">2P <b>${pctText(p.st.p2)}</b><br>3P <b>${pctText(p.st.p3)}</b></div>
+        ${p.me?'':`<button class="del" onclick="deleteFriend('${p.name.replace(/'/g,"\\'")}')">🗑</button>`}
+      </div>`).join('')
+      + `<div class="fr-row fr-avg"><div class="rk">–</div>
+           <div class="nm"><b>みんなの平均</b><div class="sm">${list.length}人・記録がある人だけで計算</div></div>
+           <div class="sp">2P <b>${pctText(avg2)}</b><br>3P <b>${pctText(avg3)}</b></div></div>`;
+  }
+
+  const sel=document.getElementById('friendCompareSelect'); const prev=sel.value;
+  sel.innerHTML = friends.length
+    ? friends.map(f=>`<option value="${escapeHtml(f.name)}">${escapeHtml(f.name)} と比較</option>`).join('')
+    : '<option value="">（フレンドを追加すると比較できます）</option>';
+  if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+  renderSpotCompare();
+}
+
+function spotLabel(sp){
+  const side = sp.x<250? '左' : '右';
+  const center = Math.abs(sp.x-250)<60;
+  if(is3(sp)){
+    if(sp.x<CORNER_X+30 || sp.x>500-CORNER_X-30) return `コーナー3（${side}）`;
+    return center? 'トップ3' : `ウイング3（${side}）`;
+  }
+  if(Math.hypot(sp.x-HOOP.x, sp.y-HOOP.y) < 2.4*PXM) return 'ペイント内';
+  if(sp.y > 380) return `ミドルコーナー（${side}）`;
+  return center? 'ミドルトップ' : `ミドルウイング（${side}）`;
+}
+function renderSpotCompare(){
+  const box=document.getElementById('spotCompare');
+  const name=document.getElementById('friendCompareSelect').value;
+  const f=friends.find(x=>x.name===name);
+  if(!f){ box.innerHTML='<div class="empty">フレンドのコードを追加すると、同じ場所どうしを比べられます。</div>'; return; }
+  const mine=myAggregatedSpots().filter(sp=>sp.attempts>0);
+  const rows=[];
+  mine.forEach(sp=>{
+    const m=f.spots.find(o=>Math.hypot(o.x-sp.x,o.y-sp.y)<=HIT_R*1.6);
+    if(m) rows.push({label:spotLabel(sp), me:sp, fr:m});
+  });
+  if(!rows.length){
+    box.innerHTML='<div class="empty">同じ場所の記録が見つかりませんでした。<br>同じメニュー（例：3Pの5ヶ所）で記録すると比較できます。</div>';
+    return;
+  }
+  box.innerHTML = `<div class="cmp-head"><div class="cl">スポット</div><div class="cv">自分</div><div class="cv">${escapeHtml(f.name)}</div><div class="cd">差</div></div>`
+    + rows.map(r=>{
+      const a=pct(r.me.makes,r.me.attempts), b=pct(r.fr.makes,r.fr.attempts), d=a-b;
+      return `<div class="cmp-row">
+        <div class="cl">${r.label}</div>
+        <div class="cv"><b>${a}%</b><br>${r.me.makes}/${r.me.attempts}</div>
+        <div class="cv"><b>${b}%</b><br>${r.fr.makes}/${r.fr.attempts}</div>
+        <div class="cd ${d>0?'win':(d<0?'lose':'')}">${d>0?'+':''}${d}</div>
+      </div>`;
+    }).join('');
+}
+
+/* ---------- マーカー ---------- */
+function spotMarker(sp, selected){
+  const g=el('g',{});
+  const p=spotPct(sp), col=colorFor(p);
+  const r=Math.min(20, 13 + sp.attempts*0.18);
+  g.appendChild(el('circle',{cx:sp.x,cy:sp.y,r:r,fill:col,'fill-opacity':0.22,stroke:col,'stroke-width':selected?3.2:2.2}));
+  const txt=el('text',{x:sp.x,y:sp.y,'text-anchor':'middle','dominant-baseline':'central',
+    'font-size':11,'font-weight':800,fill:'var(--text)'});
+  txt.textContent = `${sp.makes}/${sp.attempts}`;
+  g.appendChild(txt);
+  return g;
+}
+
+/* ---------- セット本数 ---------- */
+function renderSetBar(){
+  // ここではセッションを作らない（見るだけで空の記録が増えないように）
+  const s = sessions.find(x=>x.id===currentId);
+  const size = s? s.setSize : lastSetSize;
+  document.getElementById('setLabel').textContent = size;
+  const wrap=document.getElementById('setChips');
+  const opts = PRESETS.includes(size)?PRESETS:[...PRESETS, size].sort((a,b)=>a-b);
+  wrap.innerHTML = opts.map(v=>`<button class="${v===size?'active':''}" onclick="setSetSize(${v})">${v}本</button>`).join('')
+    + `<button onclick="customSetSize()">その他…</button>`;
+}
+function setSetSize(v){
+  lastSetSize=v; localStorage.setItem('bball_lastSetSize', v);
+  const s=currentSession();
+  s.setSize=v;
+  s.spots.forEach(sp=>{ sp.attempts=v; clampMakes(sp); });
+  save(); renderSetBar(); renderRecord();
+  if(selectedSpotId) updateSheet();
+}
+function customSetSize(){
+  const v=parseInt(prompt('1セットの本数を入力してください（例：25）', currentSession().setSize),10);
+  if(v>0 && v<=999) setSetSize(v);
+}
+
+/* ---------- タップ処理 ---------- */
+function svgPoint(svg, evt){
+  const pt=svg.createSVGPoint();
+  const src = evt.touches ? evt.touches[0] : evt;
+  pt.x=src.clientX; pt.y=src.clientY;
+  const p=pt.matrixTransform(svg.getScreenCTM().inverse());
+  return {x:p.x, y:p.y};
+}
+function findSpot(s, x, y){
+  let best=null, bd=HIT_R;
+  s.spots.forEach(sp=>{ const d=Math.hypot(sp.x-x,sp.y-y); if(d<=bd){ bd=d; best=sp; } });
+  return best;
+}
+function onCourtTap(evt){
+  evt.preventDefault();
+  const svg=document.getElementById('courtRecord');
+  const {x,y}=svgPoint(svg,evt);
+  if(x<10||x>490||y<4||y>466) return;
+  const s=currentSession();
+  s.player = document.getElementById('playerName').value.trim();
+  s.name = document.getElementById('sessionName').value.trim();
+  let sp=findSpot(s,x,y);
+  if(!sp){ sp={id:rid(), x:+x.toFixed(1), y:+y.toFixed(1), makes:0, attempts:s.setSize}; s.spots.push(sp); }
+  selectedSpotId=sp.id;
+  save(); renderRecord(); openSheet();
+}
+
+/* ---------- ボトムシート ---------- */
+function selectedSpot(){
+  const s=sessions.find(x=>x.id===currentId);
+  return s? s.spots.find(sp=>sp.id===selectedSpotId): null;
+}
+function openSheet(){
+  updateSheet();
+  document.getElementById('sheet').classList.add('open');
+  document.getElementById('scrim').classList.add('open');
+  const inp=document.getElementById('makesInput');
+  inp.focus(); inp.select();   // 開いたらすぐキーボードで入力できる
+}
+function closeSheet(){ selectedSpotId=null; document.getElementById('sheet').classList.remove('open'); document.getElementById('scrim').classList.remove('open'); renderRecord(); }
+function updateSheet(){
+  const sp=selectedSpot(); if(!sp) return;
+  const inp=document.getElementById('makesInput');
+  inp.max=sp.attempts; inp.value=sp.makes;
+  document.getElementById('denom').textContent=sp.attempts;
+  const p=spotPct(sp);
+  document.getElementById('sheetPct').textContent = p===null? '' : `成功率 ${p}%`;
+}
+function bump(d){
+  const sp=selectedSpot(); if(!sp) return;
+  sp.makes += d; clampMakes(sp);
+  save(); updateSheet(); renderRecord();
+}
+function setMakesFromInput(val){
+  const sp=selectedSpot(); if(!sp) return;
+  let n=parseInt(val,10); if(isNaN(n)) n=0;
+  sp.makes=n; clampMakes(sp);
+  save(); updateSheet(); renderRecord();
+}
+function deleteSpot(){
+  const s=sessions.find(x=>x.id===currentId), sp=selectedSpot(); if(!s||!sp) return;
+  s.spots=s.spots.filter(x=>x.id!==sp.id);
+  save(); closeSheet();
+}
+function undoLastSpot(){
+  const s=sessions.find(x=>x.id===currentId);
+  if(!s||!s.spots.length){ alert('取り消せる地点がありません。'); return; }
+  const removed=s.spots.pop();       // 最後に置いた地点を削除
+  save();
+  if(selectedSpotId===removed.id) closeSheet();
+  else renderRecord();
+}
+/* ---------- 保存まわり ---------- */
+let toastTimer=null;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'), 2600);
+}
+function updateSaveStatus(){
+  const el=document.getElementById('saveStatus'); if(!el) return;
+  const s=sessions.find(x=>x.id===currentId);
+  const t=s? tally(s.spots) : {m:0,a:0};
+  if(t.a>0){
+    const who=(s.player||'').trim();
+    el.className='save-status';
+    el.textContent=`✓ 保存済み${who?'（'+who+'）':''}　${t.m}/${t.a}本 ・ ${pct(t.m,t.a)}%`;
+  }else{
+    el.className='save-status empty';
+    el.textContent='記録するとここに自動で保存されます';
+  }
+}
+function finishSession(){
+  const s=sessions.find(x=>x.id===currentId);
+  const t=s? tally(s.spots) : {m:0,a:0};
+  if(!s || t.a===0){ toast('まだ記録がありません'); return; }
+  const d=new Date(s.date);
+  if(!s.name) s.name=`${d.getMonth()+1}/${d.getDate()} の練習`;
+  save();
+  const label=s.name;
+  // 次の練習へ。ここでは配置しない（打つ前の「0/◯本」が履歴に残らないように）
+  currentId=null; selectedSpotId=null;
+  document.getElementById('sessionName').value='';
+  renderSetBar(); renderPresetBar(); renderMenuNote(); renderRecord();
+  toast(`「${label}」を保存しました（${t.m}/${t.a}本・${pct(t.m,t.a)}%）`);
+}
+function clearSession(){
+  const s=sessions.find(x=>x.id===currentId);
+  if(!s||!s.spots.length) return;
+  if(confirm('現在のセッションの記録を全て消去しますか？')){
+    s.spots=[]; save(); renderRecord();
+  }
+}
+
+/* ---------- 写真から数値を自動入力（端末内OCR: Tesseract.js） ---------- */
+let _tessScriptLoading=null;
+function ensureTesseract(){
+  if(window.Tesseract) return Promise.resolve();
+  if(_tessScriptLoading) return _tessScriptLoading;
+  _tessScriptLoading = new Promise((resolve,reject)=>{
+    const sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    sc.onload=()=>resolve(); sc.onerror=()=>reject(new Error('tesseract load failed'));
+    document.head.appendChild(sc);
+  });
+  return _tessScriptLoading;
+}
+function showOcr(msg,sub){
+  document.getElementById('ocrMsg').textContent=msg||'解析中…';
+  if(sub!=null) document.getElementById('ocrSub').textContent=sub;
+  document.getElementById('ocrOverlay').classList.add('open');
+}
+function hideOcr(){ document.getElementById('ocrOverlay').classList.remove('open'); }
+
+// Tesseractのword一覧から数字を「上→下・左→右」の読み順で取り出す
+// 数字と紛らわしい文字を数字に直す（S→5 など。欠落してズレるのを防ぐ）
+function normalizeDigits(t){
+  return (t||'').replace(/[SsＳ]/g,'5').replace(/[OoＯ]/g,'0').replace(/[IilＩ|]/g,'1')
+                .replace(/[Bb]/g,'8').replace(/[Zz]/g,'2').replace(/[Gg]/g,'6')
+                .replace(/[Tt]/g,'7').replace(/[Aa]/g,'4').replace(/[qQ]/g,'9');
+}
+function extractOrderedNumbers(words){
+  const items=(words||[]).map(w=>{
+    const digits=normalizeDigits(w.text).replace(/[^0-9]/g,'');
+    const b=w.bbox||{x0:0,x1:0,y0:0,y1:0};
+    return {n:parseInt(digits,10), ok:digits.length>0,
+      x:(b.x0+b.x1)/2, y:(b.y0+b.y1)/2, h:Math.max(1,b.y1-b.y0)};
+  }).filter(w=>w.ok && !isNaN(w.n));
+  if(!items.length) return [];
+  items.sort((a,b)=>a.y-b.y);
+  const avgH=items.reduce((s,w)=>s+w.h,0)/items.length;
+  const thr=Math.max(12, avgH*0.6);
+  const rows=[]; let cur=[], lastY=null;
+  for(const w of items){
+    if(lastY===null || Math.abs(w.y-lastY)<=thr) cur.push(w);
+    else { rows.push(cur); cur=[w]; }
+    lastY=w.y;
+  }
+  if(cur.length) rows.push(cur);
+  const out=[];
+  rows.forEach(r=>{ r.sort((a,b)=>a.x-b.x); r.forEach(w=>out.push(w.n)); });
+  return out;
+}
+
+// 読み取った数字を、現在のスポットへ先頭から順に入れる
+function applyOcrNumbers(nums){
+  const s=currentSession();
+  if(!s.spots.length){
+    alert('先にメニューを選ぶ／コートをタップして、スポットを配置してから使ってください。');
+    return;
+  }
+  if(!nums.length || nums.every(n=>n===null)){
+    alert('数字を読み取れませんでした。明るく・まっすぐ・大きめに撮ると精度が上がります。手書きは誤認識も出るので、必要ならマークをタップして手入力してください。');
+    return;
+  }
+  // 個数が合わないときは、別のスポットへズレて入るので必ず確認を取る
+  if(nums.length !== s.spots.length){
+    const msg = `読み取った数字は ${nums.length} 個ですが、スポットは ${s.spots.length} 個です。\n`
+      + `読み取り: ${nums.map(n=>n===null?'？':n).join(', ')}\n\n`
+      + `このまま入れると、上から順にズレて入る可能性があります。\n続けますか？\n`
+      + `（キャンセルして、マークをタップして手入力するのが確実です）`;
+    if(!confirm(msg)) return;
+  }
+  let filled=0; const unread=[];
+  s.spots.forEach((sp,i)=>{
+    if(i<nums.length && nums[i]!==null){ sp.makes=Math.max(0,Math.min(sp.attempts,nums[i])); filled++; }
+    else if(i<nums.length) unread.push(i+1);      // 読めなかった行は変更しない（ズレさせない）
+  });
+  save(); renderRecord();
+  const extra  = nums.length>s.spots.length ? `\n（余った数字: ${nums.slice(s.spots.length).filter(n=>n!==null).join(', ')}）` : '';
+  const notice = unread.length ? `\n\n読めなかった箇所（上から ${unread.join(', ')} 番目）はそのままです。マークをタップして入力してください。` : '';
+  alert(`読み取り結果（上→下の順）:\n${nums.map(n=>n===null?'？':n).join(', ')}\n\n${filled} 個のスポットへ入れました。${extra}${notice}\n\n念のため各マークをタップして確認してください。`);
+}
+
+/* 写真を整える：拡大 → グレースケール → 適応的二値化（照明ムラに強い） */
+async function preprocessImage(src, targetH){
+  const bmp = await createImageBitmap(src);
+  const scale = Math.min(3, Math.max(1, (targetH||1800)/bmp.height));
+  let W=Math.round(bmp.width*scale), H=Math.round(bmp.height*scale);
+  let c=document.createElement('canvas'); c.width=W; c.height=H;
+  let g=c.getContext('2d');
+  g.filter='grayscale(1)'; g.drawImage(bmp,0,0,W,H); g.filter='none';
+
+  // 紙の内側だけを切り出す（机や紙の縁がノイズになるのを防ぐ）
+  {
+    const px=g.getImageData(0,0,W,H).data;
+    let sum=0; for(let i=0;i<px.length;i+=4) sum+=px[i];
+    const mean=sum/(W*H), thr=mean*1.05;            // これより明るければ「紙」
+    const rowOK=new Array(H).fill(false), colOK=new Array(W).fill(false);
+    for(let y=0;y<H;y++){ let n=0;
+      for(let x=0;x<W;x++) if(px[(y*W+x)*4]>thr) n++;
+      rowOK[y]= n > W*0.5; }
+    for(let x=0;x<W;x++){ let n=0;
+      for(let y=0;y<H;y++) if(px[(y*W+x)*4]>thr) n++;
+      colOK[x]= n > H*0.5; }
+    const span=(arr)=>{ let best=[0,arr.length-1], s=-1, cur=-1;
+      for(let i=0;i<=arr.length;i++){
+        if(i<arr.length && arr[i]){ if(cur<0) cur=i; }
+        else if(cur>=0){ if(i-cur > best[1]-best[0]+1 || s<0){ best=[cur,i-1]; s=1; } cur=-1; }
+      } return best; };
+    let [y0,y1]=span(rowOK), [x0,x1]=span(colOK);
+    const insetY=Math.round((y1-y0)*0.02)+4, insetX=Math.round((x1-x0)*0.02)+4;
+    x0+=insetX; x1-=insetX; y0+=insetY; y1-=insetY;
+    if(x1-x0 > W*0.25 && y1-y0 > H*0.15){        // まともに紙が見つかったときだけ切り出す
+      const cw=x1-x0+1, ch=y1-y0+1;
+      const c2=document.createElement('canvas'); c2.width=cw; c2.height=ch;
+      c2.getContext('2d').drawImage(c, x0,y0,cw,ch, 0,0,cw,ch);
+      c=c2; W=cw; H=ch; g=c.getContext('2d');
+    }
+  }
+
+  const img=g.getImageData(0,0,W,H), d=img.data;
+  const gray=new Float64Array(W*H);
+  for(let i=0,p=0;i<d.length;i+=4,p++) gray[p]=d[i];
+  const integ=new Float64Array((W+1)*(H+1));
+  for(let y=0;y<H;y++){ let rowsum=0;
+    for(let x=0;x<W;x++){ rowsum+=gray[y*W+x];
+      integ[(y+1)*(W+1)+(x+1)] = integ[y*(W+1)+(x+1)] + rowsum; } }
+  const r=Math.max(8, Math.round(Math.min(W,H)/28)), T=0.86;
+  for(let y=0;y<H;y++){
+    const y0=Math.max(0,y-r), y1=Math.min(H-1,y+r);
+    for(let x=0;x<W;x++){
+      const x0=Math.max(0,x-r), x1=Math.min(W-1,x+r);
+      const area=(x1-x0+1)*(y1-y0+1);
+      const sum=integ[(y1+1)*(W+1)+(x1+1)]-integ[y0*(W+1)+(x1+1)]-integ[(y1+1)*(W+1)+x0]+integ[y0*(W+1)+x0];
+      const v = gray[y*W+x] < (sum/area)*T ? 0 : 255;
+      const i=(y*W+x)*4; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255;
+    }
+  }
+  g.putImageData(img,0,0);
+  return c;
+}
+
+/* 傾き補正：射影の分散が最大になる角度を探して水平に戻す */
+function deskewImage(bin){
+  const W=bin.width,H=bin.height;
+  const d=bin.getContext('2d').getImageData(0,0,W,H).data;
+  const dark=[];
+  for(let y=0;y<H;y+=2) for(let x=0;x<W;x+=2) if(d[(y*W+x)*4]<128) dark.push([x-W/2,y-H/2]);
+  if(dark.length<50) return bin;
+  let best={a:0,v:-1};
+  for(let a=-8;a<=8;a+=0.25){
+    const t=a*Math.PI/180, s=Math.sin(t), c=Math.cos(t);
+    const bins=new Float64Array(H+2);
+    for(const [x,y] of dark){ const yy=Math.round(-x*s+y*c + H/2); if(yy>=0&&yy<H) bins[yy]++; }
+    let m=0; for(let i=0;i<H;i++) m+=bins[i]; m/=H;
+    let v=0; for(let i=0;i<H;i++){ const dv=bins[i]-m; v+=dv*dv; }
+    if(v>best.v) best={a,v};
+  }
+  if(Math.abs(best.a)<0.3) return bin;
+  const out=document.createElement('canvas'); out.width=W; out.height=H;
+  const g=out.getContext('2d');
+  g.fillStyle='#fff'; g.fillRect(0,0,W,H);
+  g.translate(W/2,H/2); g.rotate(-best.a*Math.PI/180); g.translate(-W/2,-H/2);
+  g.drawImage(bin,0,0);
+  return out;
+}
+
+/* 長い直線（ノートの罫線・紙の縁・中央線）を先に消す。
+   これをやらないと罫線が「文字」として多数派になり、基準サイズが狂って数字が捨てられる */
+function removeLongLines(bin){
+  const W=bin.width,H=bin.height, ctx=bin.getContext('2d');
+  const img=ctx.getImageData(0,0,W,H), d=img.data;
+  const dark=(x,y)=>d[(y*W+x)*4]<128;
+  const erase=(x,y)=>{ const i=(y*W+x)*4; d[i]=d[i+1]=d[i+2]=255; };
+  // 罫線はページをほぼ端まで貫くのに対し、数字の高さはページの1割程度。
+  // 閾値を下げすぎると数字の縦棒まで消えるので、十分に長いものだけを対象にする
+  const hMin=Math.round(W*0.20), vMin=Math.round(H*0.30);
+  for(let y=0;y<H;y++){ let run=0;
+    for(let x=0;x<=W;x++){
+      if(x<W && dark(x,y)) run++;
+      else { if(run>=hMin) for(let k=x-run;k<x;k++) erase(k,y); run=0; }
+    } }
+  for(let x=0;x<W;x++){ let run=0;
+    for(let y=0;y<=H;y++){
+      if(y<H && dark(x,y)) run++;
+      else { if(run>=vMin) for(let k=y-run;k<y;k++) erase(x,k); run=0; }
+    } }
+  ctx.putImageData(img,0,0);
+  return bin;
+}
+
+/* 文字のかたまり（連結成分）を拾う。罫線・区切り線は形で除外 */
+function findComponents(bin){
+  const W=bin.width,H=bin.height;
+  const d=bin.getContext('2d').getImageData(0,0,W,H).data;
+  const dark=new Uint8Array(W*H);
+  for(let p=0;p<W*H;p++) dark[p]= d[p*4]<128 ?1:0;
+  const seen=new Uint8Array(W*H), comps=[];
+  const qx=new Int32Array(W*H), qy=new Int32Array(W*H);
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const p=y*W+x;
+    if(!dark[p]||seen[p]) continue;
+    let head=0,tail=0; qx[tail]=x; qy[tail]=y; tail++; seen[p]=1;
+    let x0=x,x1=x,y0=y,y1=y,n=0;
+    while(head<tail){
+      const cx=qx[head], cy=qy[head]; head++; n++;
+      if(cx<x0)x0=cx; if(cx>x1)x1=cx; if(cy<y0)y0=cy; if(cy>y1)y1=cy;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+        const nx=cx+dx, ny=cy+dy;
+        if(nx<0||ny<0||nx>=W||ny>=H) continue;
+        const np=ny*W+nx;
+        if(dark[np]&&!seen[np]){ seen[np]=1; qx[tail]=nx; qy[tail]=ny; tail++; }
+      }
+    }
+    comps.push({x0,x1,y0,y1,n,w:x1-x0+1,h:y1-y0+1});
+  }
+  // 先に「線らしい形」を落としてから基準サイズを決める（罫線に引きずられないように）
+  const cand=comps.filter(c=>{
+    if(c.n<20 || c.h<H*0.012) return false;
+    const ar=c.w/c.h;
+    if(ar>5 || ar<0.12) return false;            // 極端に細長い＝線
+    if(c.h>H*0.5 || c.w>W*0.5) return false;     // 巨大＝紙の縁など
+    return c.n/(c.w*c.h) >= 0.05;
+  });
+  if(!cand.length) return [];
+  const heights=cand.map(c=>c.h).sort((a,b)=>a-b);
+  const medH=heights[Math.floor(heights.length/2)];
+  return cand.filter(c=>{
+    if(c.h < medH*0.5 || c.h > medH*2.2) return false;
+    if(c.w > medH*3.0) return false;                    // 横に長い＝線
+    if(c.h > medH*1.5 && c.w < medH*0.22) return false; // 縦に長い＝区切り線
+    return true;
+  });
+}
+
+/* 成分を行に分け、各行を「数字のかたまり」にまとめる */
+function groupIntoNumbers(comps){
+  if(!comps.length) return [];
+  const medH=[...comps].sort((a,b)=>a.h-b.h)[Math.floor(comps.length/2)].h;
+  const items=comps.map(c=>({...c, cx:(c.x0+c.x1)/2, cy:(c.y0+c.y1)/2})).sort((a,b)=>a.cy-b.cy);
+  let bands=[[items[0]]];
+  for(let i=1;i<items.length;i++){
+    const prev=bands[bands.length-1];
+    const prevCy=prev.reduce((s,x)=>s+x.cy,0)/prev.length;
+    if(Math.abs(items[i].cy-prevCy) <= medH*0.85) prev.push(items[i]);
+    else bands.push([items[i]]);
+  }
+  // 1行に数字1つだけ（縦1列のメモ）もあるので、成分数では絞らない
+  return bands.map(b=>{
+    b.sort((a,b2)=>a.cx-b2.cx);
+    const groups=[]; let cur=[b[0]];
+    for(let i=1;i<b.length;i++){
+      if(b[i].x0 - cur[cur.length-1].x1 <= medH*0.55) cur.push(b[i]);
+      else { groups.push(cur); cur=[b[i]]; }
+    }
+    groups.push(cur);
+    return groups.map(g=>({
+      x0:Math.min(...g.map(c=>c.x0)), x1:Math.max(...g.map(c=>c.x1)),
+      y0:Math.min(...g.map(c=>c.y0)), y1:Math.max(...g.map(c=>c.y1))
+    }));
+  });
+}
+
+/* 数字ひとかたまりを切り出して認識しやすい形に */
+function cropNumber(bin, g){
+  const padY=Math.round((g.y1-g.y0)*0.22)+6, padX=Math.round((g.x1-g.x0)*0.15)+8;
+  const sx=Math.max(0,g.x0-padX), sy=Math.max(0,g.y0-padY);
+  const sw=Math.min(bin.width-sx,(g.x1-g.x0)+padX*2), sh=Math.min(bin.height-sy,(g.y1-g.y0)+padY*2);
+  const targetH=140, sc=targetH/sh, m=26;
+  const c=document.createElement('canvas');
+  c.width=Math.round(sw*sc)+m*2; c.height=Math.round(sh*sc)+m*2;
+  const g2=c.getContext('2d');
+  g2.fillStyle='#fff'; g2.fillRect(0,0,c.width,c.height);
+  g2.imageSmoothingQuality='high';
+  g2.drawImage(bin, sx,sy,sw,sh, m,m, Math.round(sw*sc), Math.round(sh*sc));
+  return c;
+}
+
+/* 数字の行を自前で切り出す（Tesseractの行分割だと取りこぼしてズレるため） */
+function segmentNumberRows(bin){
+  const W=bin.width, H=bin.height;
+  const d=bin.getContext('2d').getImageData(0,0,W,H).data;
+  const dark=new Int32Array(H);
+  for(let y=0;y<H;y++){ let n=0;
+    for(let x=0;x<W;x++) if(d[(y*W+x)*4]<128) n++;
+    dark[y]=n; }
+  const minPix=Math.max(3, W*0.004);
+  const bands=[]; let start=-1;
+  for(let y=0;y<H;y++){
+    if(dark[y]>minPix){ if(start<0) start=y; }
+    else if(start>=0){ if(y-start > H*0.012) bands.push([start,y]); start=-1; }
+  }
+  if(start>=0 && H-start>H*0.012) bands.push([start,H-1]);
+  return bands.map(([y0,y1])=>{
+    let x0=W, x1=0;
+    for(let y=y0;y<=y1;y++) for(let x=0;x<W;x++)
+      if(d[(y*W+x)*4]<128){ if(x<x0)x0=x; if(x>x1)x1=x; }
+    if(x1<x0) return null;
+    const padY=Math.round((y1-y0)*0.18)+6, padX=Math.round((x1-x0)*0.12)+10;
+    const sx=Math.max(0,x0-padX), sy=Math.max(0,y0-padY);
+    const sw=Math.min(W-sx,(x1-x0)+padX*2), sh=Math.min(H-sy,(y1-y0)+padY*2);
+    const targetH=140, sc=targetH/sh, m=24;
+    const c=document.createElement('canvas');
+    c.width=Math.round(sw*sc)+m*2; c.height=Math.round(sh*sc)+m*2;
+    const g=c.getContext('2d');
+    g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height);
+    g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';
+    g.drawImage(bin, sx,sy,sw,sh, m,m, Math.round(sw*sc), Math.round(sh*sc));
+    return c;
+  }).filter(Boolean);
+}
+
+/* 切り出した1行を数字として読む（読めなければ null → そのスポットは変更しない） */
+async function recognizeOneNumber(worker, canvas, maxVal){
+  const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
+  let best=null;
+  for(const psm of ['8','10']){          // 単語 / 1文字
+    await worker.setParameters({ tessedit_pageseg_mode:psm });
+    const { data } = await worker.recognize(blob);
+    const txt=normalizeDigits((data.text||'').trim()).replace(/[^0-9]/g,'');
+    if(!txt) continue;
+    const n=parseInt(txt,10);
+    if(isNaN(n)) continue;
+    const conf=data.confidence||0;
+    const score=((maxVal==null||n<=maxVal)?1000:0)+conf;   // 本数の上限を超える値は不採用寄りに
+    if(!best || score>best.score) best={n, score};
+  }
+  return best? best.n : null;
+}
+
+/* メモ形式（上段=2P・下段=3P、紙は右コーナー→左コーナーの順）をスポットへ割り当てる */
+function applyNoteFormat(topVals, bottomVals){
+  const s=currentSession();
+  const pick=(is3p)=>s.spots.map((sp,i)=>({sp,i}))
+      .filter(o=>is3(o.sp)===is3p)
+      .sort((a,b)=>a.sp.x-b.sp.x);           // 左→右
+  const two=pick(false), three=pick(true);
+  // 紙は右→左なので、末尾から必要数を取って反転＝左→右にそろえる
+  const t2=topVals.slice(-two.length).reverse();
+  const t3=bottomVals.slice(-three.length).reverse();
+  const lines=[], unread=[];
+  const put=(list,vals,label)=>list.forEach((o,i)=>{
+    const v=vals[i];
+    if(v===null||v===undefined){ unread.push(`${label}${i+1}`); return; }
+    o.sp.makes=Math.max(0,Math.min(o.sp.attempts,v));
+  });
+  put(two,t2,'2P'); put(three,t3,'3P');
+  save(); renderRecord();
+  lines.push(`2P（左→右）: ${t2.map(v=>v===null?'？':v).join(', ')}`);
+  lines.push(`3P（左→右）: ${t3.map(v=>v===null?'？':v).join(', ')}`);
+  alert(`メモの形式として読み取りました。\n\n${lines.join('\n')}\n`
+    + (unread.length?`\n読めなかった箇所: ${unread.join(', ')}（そのままです）\n`:'')
+    + `\n念のため各マークをタップして確認してください。`);
+}
+
+async function onOcrFile(e){
+  const file=e.target.files && e.target.files[0];
+  e.target.value=''; // 同じ写真を再選択できるように
+  if(!file) return;
+  const s=currentSession();
+  if(!s.spots.length){
+    alert('先にメニューを選ぶ／コートをタップして、スポットを配置してから使ってください。');
+    return;
+  }
+  let worker=null;
+  try{
+    showOcr('準備中…','初回は文字認識データの読み込みに少し時間がかかります（要ネット接続）');
+    await ensureTesseract();
+    showOcr('写真を整えています…','傾きと明るさのムラを直しています');
+    const bin      = removeLongLines(deskewImage(await preprocessImage(file))); // 二値化→傾き補正→罫線消し
+    const rows     = groupIntoNumbers(findComponents(bin));                     // 数字ごとにまとめる
+    if(!rows.length){
+      hideOcr();
+      alert('数字を見つけられませんでした。\n・数字を大きく濃く書く\n・紙全体が入るように、まっすぐ明るく撮る\nとうまくいきやすいです。');
+      return;
+    }
+    const maxVal = Math.max(...s.spots.map(sp=>sp.attempts));
+    const total  = rows.reduce((n,r)=>n+r.length,0);
+    worker=await Tesseract.createWorker('eng',1);
+    const read=[]; let done=0;
+    for(const row of rows){
+      const vals=[];
+      for(const gnum of row){
+        showOcr('数字を認識中…', `${++done} / ${total}`);
+        vals.push(await recognizeOneNumber(worker, cropNumber(bin,gnum), maxVal));
+      }
+      read.push(vals);
+    }
+    hideOcr();
+    // 上段=2P・下段=3P の2段メモ形式か、単純な並びかを判定
+    const twoSpots   = s.spots.filter(sp=>!is3(sp)).length;
+    const threeSpots = s.spots.filter(sp=> is3(sp)).length;
+    const isNote = read.length===2 && twoSpots>0 && threeSpots>0
+                && read[0].length>=twoSpots && read[1].length>=threeSpots;
+    if(isNote) applyNoteFormat(read[0], read[1]);
+    else       applyOcrNumbers(read.flat());
+  }catch(err){
+    hideOcr();
+    alert('画像の解析に失敗しました。\n・初回はネット接続が必要です\n・明るく、数字が大きく写った写真で再度お試しください\nうまくいかない場合は、マークをタップして手入力もできます。');
+  }finally{
+    if(worker){ try{ await worker.terminate(); }catch(_){} }
+  }
+}
+
+/* ---------- 記録ビュー ---------- */
+function renderRecord(){
+  const svg=document.getElementById('courtRecord');
+  drawCourt(svg);
+  const s = sessions.find(x=>x.id===currentId);
+  const spots = s?s.spots:[];
+  spots.forEach(sp=>svg.appendChild(spotMarker(sp, sp.id===selectedSpotId)));
+  document.getElementById('statGrid').innerHTML = statCards(spots);
+  updateSaveStatus();
+}
+function statCards(spots){
+  const all=tally(spots), two=tally(spots,s=>!is3(s)), three=tally(spots,is3);
+  const c=(n,l,cls='')=>`<div class="stat ${cls}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+  return c(`${all.m}/${all.a}`,'成功/試投')
+       + c(`${pct(all.m,all.a)}%`,'FG%','pct')
+       + c(`${pct(two.m,two.a)}%`,'2P%')
+       + c(`${pct(three.m,three.a)}%`,'3P%');
+}
+
+/* ---------- チャート ---------- */
+function buildFilter(){
+  const sel=document.getElementById('chartFilter');
+  const prev=sel.value;
+  let html='<option value="all">全体合計</option>';
+  uniquePlayers().forEach(p=>{ const t=tally(playerSpots(p)); html+=`<option value="player:${p}">👤 ${p}（合計 ${t.m}/${t.a}）</option>`; });
+  sessions.forEach(s=>{ html+=`<option value="${s.id}">${sessLabel(s)}</option>`; });
+  sel.innerHTML=html;
+  if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+}
+function sessLabel(s){
+  const d=new Date(s.date), t=tally(s.spots);
+  const name=s.name|| `${d.getMonth()+1}/${d.getDate()} のセッション`;
+  const who=(s.player||'').trim()? (s.player.trim()+'・') : '';
+  return `${who}${name}（${t.m}/${t.a}本）`;
+}
+function renderChart(){
+  buildFilter();
+  const svg=document.getElementById('courtChart');
+  drawCourt(svg);
+  const f=document.getElementById('chartFilter').value;
+  let spots=[];
+  if(f==='all') sessions.forEach(s=>spots.push(...s.spots));
+  else if(f.startsWith('player:')) spots=playerSpots(f.slice(7));
+  else { const s=sessions.find(x=>x.id==f); spots=s?s.spots:[]; }
+  spots.forEach(sp=>svg.appendChild(spotMarker(sp,false)));
+  document.getElementById('chartStat').innerHTML=statCards(spots);
+  document.getElementById('playerStats').innerHTML=playerBreakdown();
+  document.getElementById('zoneStats').innerHTML=zoneBreakdown(spots);
+}
+function playerBreakdown(){
+  const players=uniquePlayers();
+  if(!players.length) return '<div class="empty">「打つ人の名前」を入力して記録すると、ここに名前ごとの成績が出ます。</div>';
+  return players.map(p=>{
+    const sp=playerSpots(p), all=tally(sp), two=tally(sp,s=>!is3(s)), three=tally(sp,is3);
+    return `<div class="prow">
+      <div class="pn">${p}<div class="pd">${all.m}/${all.a}本 ・ 2P ${pct(two.m,two.a)}% ・ 3P ${pct(three.m,three.a)}%</div></div>
+      <div class="pp">${pct(all.m,all.a)}%</div>
+    </div>`;
+  }).join('');
+}
+function zoneBreakdown(spots){
+  const dist=s=>Math.hypot(s.x-HOOP.x,s.y-HOOP.y);
+  const zones=[
+    {n:'ペイント内', f:s=>dist(s) < 2.4*PXM},
+    {n:'ミッドレンジ', f:s=>!is3(s) && dist(s) >= 2.4*PXM},
+    {n:'コーナー3', f:s=>is3(s) && (s.x<CORNER_X+20 || s.x>500-CORNER_X-20)},
+    {n:'アーク3', f:s=>is3(s) && !(s.x<CORNER_X+20 || s.x>500-CORNER_X-20)},
+  ];
+  return zones.map(z=>{
+    const t=tally(spots,z.f), p=pct(t.m,t.a);
+    return `<div class="zone-row"><span class="zn">${z.n}</span>
+      <span class="zv">${t.m}/${t.a}</span>
+      <span class="bar"><i style="width:${p}%"></i></span>
+      <span class="zv" style="width:34px;text-align:right">${p}%</span></div>`;
+  }).join('');
+}
+
+/* ---------- 履歴 ---------- */
+function renderHistory(){
+  const wrap=document.getElementById('histList');
+  const list=sessions.filter(s=>s.spots.length);   // 中身のない練習は出さない
+  if(!list.length){ wrap.innerHTML='<div class="empty">まだ記録がありません。<br>「記録」タブから始めましょう。</div>'; return; }
+  wrap.innerHTML=list.map(s=>{
+    const d=new Date(s.date), t=tally(s.spots);
+    const name=s.name||`${d.getMonth()+1}/${d.getDate()} のセッション`;
+    const who=(s.player||'').trim()? `${s.player.trim()}｜` : '';
+    return `<div class="hist-item">
+      <div class="d" onclick="openSession(${s.id})">
+        <div class="t">${who}${name}</div>
+        <div class="s">${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ・ 1セット${s.setSize}本 ・ ${t.m}/${t.a}本</div>
+      </div>
+      <div class="pc">${pct(t.m,t.a)}%</div>
+      <button class="del" onclick="delSession(${s.id})">🗑</button>
+    </div>`;
+  }).join('');
+}
+function openSession(id){
+  currentId=id; selectedSpotId=null;
+  const s=sessions.find(x=>x.id===id);
+  document.getElementById('playerName').value=s.player||'';
+  document.getElementById('sessionName').value=s.name||'';
+  switchView('record'); renderSetBar(); renderRecord();
+}
+function delSession(id){
+  if(!confirm('このセッションを削除しますか？')) return;
+  sessions=sessions.filter(s=>s.id!==id);
+  if(currentId===id) currentId=null;
+  save(); renderHistory();
+}
+
+/* ---------- 書き出し／読み込み ---------- */
+function exportData(){
+  const blob=new Blob([JSON.stringify({sessions, presets},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='shot-tracker-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+}
+function importData(e){
+  const file=e.target.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{
+    let d=JSON.parse(r.result);
+    const arr = Array.isArray(d) ? d : d.sessions;      // 旧形式(配列)にも対応
+    if(Array.isArray(arr)){
+      localStorage.setItem('bball_shots', JSON.stringify(arr));
+      sessions=load(); currentId=null; save();
+      if(d.presets && Array.isArray(d.presets)){ presets=d.presets; savePresets(); renderPresetBar(); }
+      renderHistory();
+      alert('読み込みました（'+sessions.length+'セッション）');
+    }
+  }catch(err){ alert('ファイルを読めませんでした'); } };
+  r.readAsText(file);
+}
+
+/* ---------- ナビ ---------- */
+function switchView(v){
+  closeSheet();
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+  if(v==='chart') renderChart();
+  if(v==='friends') renderFriends();
+  if(v==='history') renderHistory();
+  if(v==='record'){ renderSetBar(); renderPresetBar(); renderMenuNote(); renderRecord(); }
+}
+
+/* ---------- 起動 ---------- */
+document.getElementById('courtRecord').addEventListener('click', onCourtTap);
+document.getElementById('makesInput').addEventListener('input', e=>setMakesFromInput(e.target.value));
+document.getElementById('sessionName').addEventListener('input', e=>{
+  const s=sessions.find(x=>x.id===currentId); if(s){ s.name=e.target.value; save(); }
+});
+['input','change'].forEach(ev=>document.getElementById('playerName').addEventListener(ev, e=>{
+  const s=sessions.find(x=>x.id===currentId); if(s){ s.player=e.target.value; save(); }
+  const v=e.target.value.trim();
+  if(v) localStorage.setItem('bball_lastPlayer', v); // 次回起動時も同じ名前で使えるように
+  renderPlayerList();
+  updateSaveStatus();
+}));
+if(sessions.length && tally(sessions[0].spots).a===0) currentId=sessions[0].id;
+if(currentId){ const s=sessions.find(x=>x.id===currentId); if(s){ document.getElementById('playerName').value=s.player||''; document.getElementById('sessionName').value=s.name||''; } }
+if(!document.getElementById('playerName').value) document.getElementById('playerName').value = localStorage.getItem('bball_lastPlayer')||'';
+seedDefaultPresets();
+renderPlayerList(); renderSetBar(); renderPresetBar(); renderMenuNote(); renderRecord();
+</script>
+<script>
+/* Service Worker 登録（オフライン動作＋ホーム画面インストール） */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
